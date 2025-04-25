@@ -4,14 +4,30 @@
   <meta charset="UTF-8">
   <title>OSM Straßenfilter – Braunau</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body, html { margin: 0; padding: 0; height: 100%; }
     #map { width: 100%; height: 100%; }
-    #filter {
+    #toggleButtons {
       position: absolute;
       top: 10px;
+      right: 10px;
+      z-index: 1100;
+      display: flex;
+      gap: 5px;
+    }
+    #toggleButtons button {
+      background: #0078A8;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #filter {
+      position: absolute;
+      top: 50px;
       right: 10px;
       z-index: 1000;
       background: white;
@@ -20,7 +36,8 @@
       box-shadow: 0 0 5px rgba(0,0,0,0.3);
       font-family: sans-serif;
       font-size: 14px;
-      min-width: 200px;
+      min-width: 240px;
+      display: block;
     }
     #filter label {
       display: flex;
@@ -34,13 +51,18 @@
       display: inline-block;
       border: 1px solid #000;
     }
-    #legend {
-      margin-top: 10px;
-      display: none;
-    }
-    #legend div {
-      margin-bottom: 4px;
+    #legendBox {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      font-family: sans-serif;
       font-size: 13px;
+      display: none;
     }
     #loading {
       margin-top: 10px;
@@ -48,11 +70,35 @@
       color: gray;
       display: none;
     }
+    #search {
+      margin-bottom: 10px;
+    }
+    input, button, select {
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+    #results {
+      margin-top: 6px;
+      display: none;
+    }
   </style>
 </head>
 <body>
 
+<div id="toggleButtons">
+  <button onclick="toggleFilter()">Menü</button>
+  <button onclick="toggleLegend()">Legende</button>
+</div>
+
 <div id="filter">
+  <div id="search">
+    <form id="searchForm" onsubmit="searchLocation(); return false;">
+      <input type="text" id="searchInput" placeholder="Ort oder Stadt suchen" style="width: 100%; margin-bottom: 6px;">
+      <button id="searchButton" type="submit">Suchen</button>
+      <select id="results" onchange="selectLocation()"></select>
+    </form>
+  </div>
+
   <strong>Oberfläche filtern:</strong><br>
   <label><span class="color-box" style="background:black;"></span><input type="checkbox" value="asphalt" checked> Asphalt</label>
   <label><span class="color-box" style="background:brown;"></span><input type="checkbox" value="gravel" checked> Schotter</label>
@@ -63,24 +109,20 @@
   <label><span class="color-box" style="background:blue;"></span><input type="checkbox" value="unbekannt" checked> Unbekannt</label>
 
   <button id="loadButton" onclick="loadData()">Neu laden</button>
-  <button onclick="toggleLegend()">Legende anzeigen</button>
+</div>
 
-  <div id="loading">Bitte warten, Daten werden geladen...</div>
-
-  <div id="legend">
-    <div><span class="color-box" style="background:black;"></span> Asphalt</div>
-    <div><span class="color-box" style="background:brown;"></span> Schotter (gravel)</div>
-    <div><span class="color-box" style="background:gray;"></span> Unbefestigt (unpaved)</div>
-    <div><span class="color-box" style="background:saddlebrown;"></span> Erde (dirt)</div>
-    <div><span class="color-box" style="background:green;"></span> Gepflastert (paved)</div>
-    <div><span class="color-box" style="background:orange;"></span> Verdichtet (compacted)</div>
-    <div><span class="color-box" style="background:blue;"></span> Unbekannt (kein surface-Tag)</div>
-  </div>
+<div id="legendBox">
+  <div><span class="color-box" style="background:black;"></span> Asphalt</div>
+  <div><span class="color-box" style="background:brown;"></span> Schotter (gravel)</div>
+  <div><span class="color-box" style="background:gray;"></span> Unbefestigt (unpaved)</div>
+  <div><span class="color-box" style="background:saddlebrown;"></span> Erde (dirt)</div>
+  <div><span class="color-box" style="background:green;"></span> Gepflastert (paved)</div>
+  <div><span class="color-box" style="background:orange;"></span> Verdichtet (compacted)</div>
+  <div><span class="color-box" style="background:blue;"></span> Unbekannt (kein surface-Tag)</div>
 </div>
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -92,6 +134,103 @@
   }).addTo(map);
 
   let currentLayer;
+  let searchResults = [];
+  let marker;
+  let filterVisible = true;
+  let legendVisible = false;
+
+  function toggleFilter() {
+    const filter = document.getElementById('filter');
+    if (filterVisible) {
+      filter.style.display = 'none';
+    } else {
+      filter.style.display = 'block';
+    }
+    filterVisible = !filterVisible;
+  }
+
+  function toggleLegend() {
+    const legend = document.getElementById('legendBox');
+    if (legendVisible) {
+      legend.style.display = 'none';
+    } else {
+      legend.style.display = 'block';
+    }
+    legendVisible = !legendVisible;
+  }
+
+  async function searchLocation() {
+    const input = document.getElementById('searchInput').value.trim();
+    const searchButton = document.getElementById('searchButton');
+    const results = document.getElementById('results');
+
+    if (!input) {
+      alert("Bitte gib einen Ort oder eine Stadt ein.");
+      return;
+    }
+
+    searchButton.disabled = true;
+    searchButton.textContent = "Sucht...";
+    results.style.display = "none";
+    results.innerHTML = "";
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`;
+
+    try {
+      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      const data = await response.json();
+
+      if (data.length === 0) {
+        alert("Kein Ort gefunden.");
+        resetSearchButton();
+        return;
+      }
+
+      searchResults = data;
+      if (data.length === 1) {
+        centerMap(data[0]);
+      } else {
+        data.forEach((place, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.text = place.display_name;
+          results.appendChild(option);
+        });
+        results.style.display = "block";
+      }
+    } catch (error) {
+      console.error("Fehler bei der Suche:", error);
+      alert("Fehler bei der Suche. Bitte versuche es später nochmal.");
+    }
+
+    resetSearchButton();
+  }
+
+  function selectLocation() {
+    const results = document.getElementById('results');
+    const selectedIndex = results.value;
+    const selectedPlace = searchResults[selectedIndex];
+    if (selectedPlace) {
+      centerMap(selectedPlace);
+    }
+  }
+
+  function centerMap(place) {
+    const lat = parseFloat(place.lat);
+    const lon = parseFloat(place.lon);
+    map.setView([lat, lon], 12);
+
+    if (marker) {
+      map.removeLayer(marker);
+    }
+    marker = L.marker([lat, lon]).addTo(map);
+  }
+
+  function resetSearchButton() {
+    const searchButton = document.getElementById('searchButton');
+    searchButton.disabled = false;
+    searchButton.textContent = "Suchen";
+  }
 
   function getSelectedSurfaces() {
     return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
@@ -130,33 +269,10 @@
     `;
   }
 
-  function overpassToGeoJSON(data) {
-    const features = data.elements
-      .filter(el => el.type === 'way' && el.geometry)
-      .map(way => ({
-        type: "Feature",
-        properties: {
-          id: way.id,
-          surface: way.tags?.surface || 'unbekannt'
-        },
-        geometry: {
-          type: "LineString",
-          coordinates: way.geometry.map(p => [p.lon, p.lat])
-        }
-      }));
-    return {
-      type: "FeatureCollection",
-      features: features
-    };
-  }
-
   async function loadData() {
     const loadButton = document.getElementById('loadButton');
-    const loadingText = document.getElementById('loading');
-
     loadButton.disabled = true;
     loadButton.textContent = "Lädt...";
-    loadingText.style.display = "block";
 
     const surfaces = getSelectedSurfaces();
     const query = buildOverpassQuery(surfaces);
@@ -178,22 +294,13 @@
         const response = await fetch(server, {
           method: "POST",
           body: query,
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-          }
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
         });
-
         const text = await response.text();
-
-        try {
-          data = JSON.parse(text);
-          console.log("Erfolgreich geladen von:", server);
-          break;
-        } catch (e) {
-          console.warn("Antwort war kein JSON von", server, "\nAntwort:\n", text);
-        }
-      } catch (err) {
-        console.error("Fehler beim Server:", server, err);
+        data = JSON.parse(text);
+        break;
+      } catch (error) {
+        console.error("Fehler bei Server:", server, error);
       }
     }
 
@@ -217,13 +324,30 @@
     resetLoading();
   }
 
+  function overpassToGeoJSON(data) {
+    const features = data.elements
+      .filter(el => el.type === 'way' && el.geometry)
+      .map(way => ({
+        type: "Feature",
+        properties: {
+          id: way.id,
+          surface: way.tags?.surface || 'unbekannt'
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: way.geometry.map(p => [p.lon, p.lat])
+        }
+      }));
+    return {
+      type: "FeatureCollection",
+      features: features
+    };
+  }
+
   function resetLoading() {
     const loadButton = document.getElementById('loadButton');
-    const loadingText = document.getElementById('loading');
-
     loadButton.disabled = false;
     loadButton.textContent = "Neu laden";
-    loadingText.style.display = "none";
   }
 
   function surfaceColor(type) {
@@ -239,10 +363,9 @@
     return colors[type] || "blue";
   }
 
-  function toggleLegend() {
-    const legend = document.getElementById('legend');
-    legend.style.display = (legend.style.display === 'none') ? 'block' : 'none';
-  }
+  window.onload = () => {
+    document.getElementById('searchInput').focus();
+  };
 </script>
 
 </body>
