@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OSM Straßenfilter – Braunau</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    #filter {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      font-family: sans-serif;
+      font-size: 14px;
+      min-width: 200px;
+    }
+    #filter label {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .color-box {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      display: inline-block;
+      border: 1px solid #000;
+    }
+    #legend {
+      margin-top: 10px;
+      display: none;
+    }
+    #legend div {
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    #loading {
+      margin-top: 10px;
+      font-size: 13px;
+      color: gray;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="filter">
+  <strong>Oberfläche filtern:</strong><br>
+  <label><span class="color-box" style="background:black;"></span><input type="checkbox" value="asphalt" checked> Asphalt</label>
+  <label><span class="color-box" style="background:brown;"></span><input type="checkbox" value="gravel" checked> Schotter</label>
+  <label><span class="color-box" style="background:gray;"></span><input type="checkbox" value="unpaved" checked> Unbefestigt</label>
+  <label><span class="color-box" style="background:saddlebrown;"></span><input type="checkbox" value="dirt" checked> Erde</label>
+  <label><span class="color-box" style="background:green;"></span><input type="checkbox" value="paved" checked> Gepflastert</label>
+  <label><span class="color-box" style="background:orange;"></span><input type="checkbox" value="compacted" checked> Verdichtet</label>
+  <label><span class="color-box" style="background:blue;"></span><input type="checkbox" value="unbekannt" checked> Unbekannt</label>
+
+  <button id="loadButton" onclick="loadData()">Neu laden</button>
+  <button onclick="toggleLegend()">Legende anzeigen</button>
+
+  <div id="loading">Bitte warten, Daten werden geladen...</div>
+
+  <div id="legend">
+    <div><span class="color-box" style="background:black;"></span> Asphalt</div>
+    <div><span class="color-box" style="background:brown;"></span> Schotter (gravel)</div>
+    <div><span class="color-box" style="background:gray;"></span> Unbefestigt (unpaved)</div>
+    <div><span class="color-box" style="background:saddlebrown;"></span> Erde (dirt)</div>
+    <div><span class="color-box" style="background:green;"></span> Gepflastert (paved)</div>
+    <div><span class="color-box" style="background:orange;"></span> Verdichtet (compacted)</div>
+    <div><span class="color-box" style="background:blue;"></span> Unbekannt (kein surface-Tag)</div>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([48.2583, 13.0333], 10);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap-Mitwirkende'
+  }).addTo(map);
+
+  let currentLayer;
+
+  function getSelectedSurfaces() {
+    return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
+                .map(cb => cb.value);
+  }
+
+  function buildOverpassQuery(selectedSurfaces) {
+    if (selectedSurfaces.length === 0) return null;
+
+    const bbox = map.getBounds();
+    const south = bbox.getSouth();
+    const west = bbox.getWest();
+    const north = bbox.getNorth();
+    const east = bbox.getEast();
+
+    const knownSurfaces = selectedSurfaces.filter(s => s !== "unbekannt");
+    const includeUnknown = selectedSurfaces.includes("unbekannt");
+
+    let queryParts = [];
+
+    if (knownSurfaces.length > 0) {
+      const surfaceFilter = knownSurfaces.join('|');
+      queryParts.push(`way["highway"]["surface"~"${surfaceFilter}"](${south},${west},${north},${east});`);
+    }
+
+    if (includeUnknown) {
+      queryParts.push(`way["highway"]["surface"!~"."](${south},${west},${north},${east});`);
+    }
+
+    return `
+      [out:json][timeout:25];
+      (
+        ${queryParts.join('\n')}
+      );
+      out geom;
+    `;
+  }
+
+  function overpassToGeoJSON(data) {
+    const features = data.elements
+      .filter(el => el.type === 'way' && el.geometry)
+      .map(way => ({
+        type: "Feature",
+        properties: {
+          id: way.id,
+          surface: way.tags?.surface || 'unbekannt'
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: way.geometry.map(p => [p.lon, p.lat])
+        }
+      }));
+    return {
+      type: "FeatureCollection",
+      features: features
+    };
+  }
+
+  async function loadData() {
+    const loadButton = document.getElementById('loadButton');
+    const loadingText = document.getElementById('loading');
+
+    loadButton.disabled = true;
+    loadButton.textContent = "Lädt...";
+    loadingText.style.display = "block";
+
+    const surfaces = getSelectedSurfaces();
+    const query = buildOverpassQuery(surfaces);
+    if (!query) {
+      alert("Bitte mindestens eine Oberfläche auswählen.");
+      resetLoading();
+      return;
+    }
+
+    const servers = [
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass-api.de/api/interpreter"
+    ];
+
+    let data = null;
+
+    for (let server of servers) {
+      try {
+        const response = await fetch(server, {
+          method: "POST",
+          body: query,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          }
+        });
+
+        const text = await response.text();
+
+        try {
+          data = JSON.parse(text);
+          console.log("Erfolgreich geladen von:", server);
+          break;
+        } catch (e) {
+          console.warn("Antwort war kein JSON von", server, "\nAntwort:\n", text);
+        }
+      } catch (err) {
+        console.error("Fehler beim Server:", server, err);
+      }
+    }
+
+    if (!data) {
+      alert("Fehler: Keine gültigen Daten von Overpass-Server erhalten.");
+      resetLoading();
+      return;
+    }
+
+    const geojson = overpassToGeoJSON(data);
+
+    if (currentLayer) map.removeLayer(currentLayer);
+
+    currentLayer = L.geoJSON(geojson, {
+      style: feature => ({
+        color: surfaceColor(feature.properties.surface),
+        weight: 3
+      })
+    }).addTo(map);
+
+    resetLoading();
+  }
+
+  function resetLoading() {
+    const loadButton = document.getElementById('loadButton');
+    const loadingText = document.getElementById('loading');
+
+    loadButton.disabled = false;
+    loadButton.textContent = "Neu laden";
+    loadingText.style.display = "none";
+  }
+
+  function surfaceColor(type) {
+    const colors = {
+      asphalt: "black",
+      gravel: "brown",
+      unpaved: "gray",
+      dirt: "saddlebrown",
+      paved: "green",
+      compacted: "orange",
+      unbekannt: "blue"
+    };
+    return colors[type] || "blue";
+  }
+
+  function toggleLegend() {
+    const legend = document.getElementById('legend');
+    legend.style.display = (legend.style.display === 'none') ? 'block' : 'none';
+  }
+</script>
+
+</body>
+</html>
