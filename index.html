@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>OSM Straßenfilter – Braunau</title>
+  <title>OSM Straßenfilter – für Christoph</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -161,8 +161,11 @@
   <select id="results" onchange="selectLocation()" style="display:none;"></select>
 </div>
 
+<!-- Erweiterte Filterbox -->
 <div id="filter">
   <strong>Oberfläche filtern:</strong><br>
+
+  <!-- Bekannt aus deiner bisherigen Liste -->
   <label><span class="color-box" style="background:black;"></span><input type="checkbox" value="asphalt" checked> Asphalt</label>
   <label><span class="color-box" style="background:brown;"></span><input type="checkbox" value="gravel" checked> Schotter</label>
   <label><span class="color-box" style="background:gray;"></span><input type="checkbox" value="unpaved" checked> Unbefestigt</label>
@@ -170,8 +173,28 @@
   <label><span class="color-box" style="background:green;"></span><input type="checkbox" value="paved" checked> Gepflastert</label>
   <label><span class="color-box" style="background:orange;"></span><input type="checkbox" value="compacted" checked> Verdichtet</label>
   <label><span class="color-box" style="background:blue;"></span><input type="checkbox" value="unbekannt" checked> Unbekannt</label>
+
+  <!-- NEU hinzugefügt -->
+  <label><span class="color-box" style="background:lightgreen;"></span><input type="checkbox" value="grass"> Gras</label>
+  <label><span class="color-box" style="background:burlywood;"></span><input type="checkbox" value="ground"> Naturboden</label>
+  <label><span class="color-box" style="background:khaki;"></span><input type="checkbox" value="sand"> Sand</label>
+  <label><span class="color-box" style="background:peru;"></span><input type="checkbox" value="mud"> Schlamm</label>
+  <label><span class="color-box" style="background:tan;"></span><input type="checkbox" value="wood"> Holz</label>
+  <label><span class="color-box" style="background:lightgray;"></span><input type="checkbox" value="concrete"> Beton</label>
+  <label><span class="color-box" style="background:lightgray;"></span><input type="checkbox" value="concrete:plates"> Betonplatten</label>
+  <label><span class="color-box" style="background:darkgray;"></span><input type="checkbox" value="cobblestone"> Kopfsteinpflaster</label>
+  <label><span class="color-box" style="background:darkgray;"></span><input type="checkbox" value="cobblestone:flattened"> Flaches Pflaster</label>
+  <label><span class="color-box" style="background:darkgray;"></span><input type="checkbox" value="paving_stones"> Pflastersteine</label>
+  <label><span class="color-box" style="background:darkgray;"></span><input type="checkbox" value="sett"> Rechteckpflaster</label>
+  <label><span class="color-box" style="background:silver;"></span><input type="checkbox" value="metal"> Metall</label>
+  <label><span class="color-box" style="background:sienna;"></span><input type="checkbox" value="woodchips"> Hackschnitzel</label>
+  <label><span class="color-box" style="background:lightblue;"></span><input type="checkbox" value="ice"> Eis</label>
+  <label><span class="color-box" style="background:whitesmoke;"></span><input type="checkbox" value="snow"> Schnee</label>
+  <label><span class="color-box" style="background:lightgray;"></span><input type="checkbox" value="pebblestone"> Kieselsteine</label>
+
 </div>
 
+<!-- Erweiterte Legendenbox -->
 <div id="legendBox">
   <div><span class="color-box" style="background:black;"></span> Asphalt</div>
   <div><span class="color-box" style="background:brown;"></span> Schotter (gravel)</div>
@@ -180,6 +203,24 @@
   <div><span class="color-box" style="background:green;"></span> Gepflastert (paved)</div>
   <div><span class="color-box" style="background:orange;"></span> Verdichtet (compacted)</div>
   <div><span class="color-box" style="background:blue;"></span> Unbekannt (kein surface-Tag)</div>
+
+  <!-- Neu -->
+  <div><span class="color-box" style="background:lightgreen;"></span> Gras</div>
+  <div><span class="color-box" style="background:burlywood;"></span> Naturboden</div>
+  <div><span class="color-box" style="background:khaki;"></span> Sand</div>
+  <div><span class="color-box" style="background:peru;"></span> Schlamm</div>
+  <div><span class="color-box" style="background:tan;"></span> Holz</div>
+  <div><span class="color-box" style="background:lightgray;"></span> Beton</div>
+  <div><span class="color-box" style="background:lightgray;"></span> Betonplatten</div>
+  <div><span class="color-box" style="background:darkgray;"></span> Kopfsteinpflaster</div>
+  <div><span class="color-box" style="background:darkgray;"></span> Flaches Pflaster</div>
+  <div><span class="color-box" style="background:darkgray;"></span> Pflastersteine</div>
+  <div><span class="color-box" style="background:darkgray;"></span> Rechteckpflaster</div>
+  <div><span class="color-box" style="background:silver;"></span> Metall</div>
+  <div><span class="color-box" style="background:sienna;"></span> Hackschnitzel</div>
+  <div><span class="color-box" style="background:lightblue;"></span> Eis</div>
+  <div><span class="color-box" style="background:whitesmoke;"></span> Schnee</div>
+  <div><span class="color-box" style="background:lightgray;"></span> Kieselsteine</div>
 </div>
 
 <div id="map"></div>
@@ -475,7 +516,23 @@ function surfaceColor(type) {
     dirt: "saddlebrown",
     paved: "green",
     compacted: "orange",
-    unbekannt: "blue"
+    unbekannt: "blue",
+    grass: "lightgreen",
+    ground: "burlywood",
+    sand: "khaki",
+    mud: "peru",
+    wood: "tan",
+    concrete: "lightgray",
+    "concrete:plates": "lightgray",
+    cobblestone: "darkgray",
+    "cobblestone:flattened": "darkgray",
+    paving_stones: "darkgray",
+    sett: "darkgray",
+    metal: "silver",
+    woodchips: "sienna",
+    ice: "lightblue",
+    snow: "whitesmoke",
+    pebblestone: "lightgray"
   };
   return colors[type] || "blue";
 }
