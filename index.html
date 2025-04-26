@@ -8,6 +8,7 @@
   <style>
     body, html { margin: 0; padding: 0; height: 100%; }
     #map { width: 100%; height: 100%; }
+
     #toggleButtons {
       position: absolute;
       top: 10px;
@@ -25,10 +26,9 @@
       cursor: pointer;
       font-size: 14px;
     }
-    #filter {
+
+    #filter, #legendBox, #searchArea {
       position: absolute;
-      top: 50px;
-      right: 10px;
       z-index: 1000;
       background: white;
       padding: 10px;
@@ -37,8 +37,49 @@
       font-family: sans-serif;
       font-size: 14px;
       min-width: 240px;
-      display: block;
+      max-height: 90%;
+      overflow: auto;
+      transition: all 0.3s ease;
     }
+    #filter {
+      top: 50px;
+      right: 10px;
+    }
+    #legendBox {
+      top: 10px;
+      left: 50px;
+      display: none;
+      font-size: 13px;
+    }
+    #searchArea {
+      top: 10px;
+      left: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 5px;
+    }
+    .hidden {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
+    }
+
+    #searchArea input, #searchArea select {
+      width: 220px;
+      font-size: 14px;
+      padding: 4px;
+    }
+    #searchArea button {
+      background: #0078A8;
+      color: white;
+      border: none;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
     #filter label {
       display: flex;
       align-items: center;
@@ -51,54 +92,67 @@
       display: inline-block;
       border: 1px solid #000;
     }
-    #legendBox {
+
+    #zoomLevel {
       position: absolute;
-      top: 10px;
-      left: 50px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
+      bottom: 10px;
+      right: 10px;
+      z-index: 1200;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
       border-radius: 6px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
       font-family: sans-serif;
       font-size: 13px;
-      display: none;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
-    #loading {
-      margin-top: 10px;
-      font-size: 13px;
-      color: gray;
+
+    /* Ladeanimation */
+    #loadingOverlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.7);
       display: none;
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      font-size: 18px;
     }
-    #search {
+    #loadingSpinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #0078A8;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
       margin-bottom: 10px;
     }
-    input, button, select {
-      font-family: sans-serif;
-      font-size: 14px;
-    }
-    #results {
-      margin-top: 6px;
-      display: none;
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
     }
   </style>
 </head>
 <body>
 
 <div id="toggleButtons">
-  <button onclick="toggleFilter()">Menü</button>
+  <button onclick="toggleSearchArea()">Suche</button>
+  <button onclick="toggleFilter()">Filter</button>
   <button onclick="toggleLegend()">Legende</button>
+  <button onclick="clearMarkers()">Markierungen löschen</button>
+  <button onclick="resetMap()">Zurücksetzen</button>
+</div>
+
+<div id="searchArea">
+  <input type="text" id="searchInput" placeholder="Ort oder Stadt suchen">
+  <div style="display: flex; gap: 5px;">
+    <button onclick="searchLocation()">Suchen</button>
+    <button onclick="clearSearch()">Löschen</button>
+  </div>
+  <select id="results" onchange="selectLocation()" style="display:none;"></select>
 </div>
 
 <div id="filter">
-  <div id="search">
-    <form id="searchForm" onsubmit="searchLocation(); return false;">
-      <input type="text" id="searchInput" placeholder="Ort oder Stadt suchen" style="width: 100%; margin-bottom: 6px;">
-      <button id="searchButton" type="submit">Suchen</button>
-      <select id="results" onchange="selectLocation()"></select>
-    </form>
-  </div>
-
   <strong>Oberfläche filtern:</strong><br>
   <label><span class="color-box" style="background:black;"></span><input type="checkbox" value="asphalt" checked> Asphalt</label>
   <label><span class="color-box" style="background:brown;"></span><input type="checkbox" value="gravel" checked> Schotter</label>
@@ -108,7 +162,7 @@
   <label><span class="color-box" style="background:orange;"></span><input type="checkbox" value="compacted" checked> Verdichtet</label>
   <label><span class="color-box" style="background:blue;"></span><input type="checkbox" value="unbekannt" checked> Unbekannt</label>
 
-  <button id="loadButton" onclick="loadData()">Neu laden</button>
+  <button id="loadButton" onclick="loadData()" style="margin-top:10px; width:100%;">Neu laden</button>
 </div>
 
 <div id="legendBox">
@@ -122,250 +176,327 @@
 </div>
 
 <div id="map"></div>
+<div id="zoomLevel">Zoom: 10</div>
+<div id="loadingOverlay">
+  <div id="loadingSpinner"></div>
+  Lädt Daten...
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-  const map = L.map('map').setView([48.2583, 13.0333], 10);
+// Dein JavaScript kommt im nächsten Schritt (zu lang für eine Nachricht) 🚀
+// Schreib einfach "weiter", dann geht's sofort weiter!
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap-Mitwirkende'
-  }).addTo(map);
+const map = L.map('map').setView([48.2583, 13.0333], 10);
+const startPosition = [48.2583, 13.0333];
+const startZoom = 10;
 
-  let currentLayer;
-  let searchResults = [];
-  let marker;
-  let filterVisible = true;
-  let legendVisible = false;
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap-Mitwirkende'
+}).addTo(map);
 
-  function toggleFilter() {
-    const filter = document.getElementById('filter');
-    if (filterVisible) {
-      filter.style.display = 'none';
-    } else {
-      filter.style.display = 'block';
-    }
-    filterVisible = !filterVisible;
+let currentLayer;
+let searchResults = [];
+let marker;
+let filterVisible = true;
+let legendVisible = false;
+let searchVisible = true;
+
+// Suchbereich ein-/ausblenden
+function toggleSearchArea() {
+  const searchArea = document.getElementById('searchArea');
+  if (searchVisible) {
+    searchArea.classList.add('hidden');
+    setTimeout(() => searchArea.style.display = 'none', 300);
+  } else {
+    searchArea.style.display = 'flex';
+    setTimeout(() => searchArea.classList.remove('hidden'), 10);
+  }
+  searchVisible = !searchVisible;
+}
+
+// Filter ein-/ausblenden
+function toggleFilter() {
+  const filter = document.getElementById('filter');
+  if (filterVisible) {
+    filter.classList.add('hidden');
+    setTimeout(() => filter.style.display = 'none', 300);
+  } else {
+    filter.style.display = 'block';
+    setTimeout(() => filter.classList.remove('hidden'), 10);
+  }
+  filterVisible = !filterVisible;
+}
+
+// Legende ein-/ausblenden
+function toggleLegend() {
+  const legend = document.getElementById('legendBox');
+  if (legendVisible) {
+    legend.classList.add('hidden');
+    setTimeout(() => legend.style.display = 'none', 300);
+  } else {
+    legend.style.display = 'block';
+    setTimeout(() => legend.classList.remove('hidden'), 10);
+  }
+  legendVisible = !legendVisible;
+}
+
+// Markierungen löschen
+function clearMarkers() {
+  if (currentLayer) {
+    map.removeLayer(currentLayer);
+    currentLayer = null;
+  }
+  if (marker) {
+    map.removeLayer(marker);
+    marker = null;
+  }
+}
+
+// Karte zurücksetzen
+function resetMap() {
+  clearMarkers();
+  map.setView(startPosition, startZoom);
+}
+
+// Suche ausführen
+async function searchLocation() {
+  const input = document.getElementById('searchInput').value.trim();
+  const results = document.getElementById('results');
+
+  if (!input) {
+    alert("Bitte gib einen Ort oder eine Stadt ein.");
+    return;
   }
 
-  function toggleLegend() {
-    const legend = document.getElementById('legendBox');
-    if (legendVisible) {
-      legend.style.display = 'none';
-    } else {
-      legend.style.display = 'block';
-    }
-    legendVisible = !legendVisible;
-  }
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`;
 
-  async function searchLocation() {
-    const input = document.getElementById('searchInput').value.trim();
-    const searchButton = document.getElementById('searchButton');
-    const results = document.getElementById('results');
+  try {
+    const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+    const data = await response.json();
 
-    if (!input) {
-      alert("Bitte gib einen Ort oder eine Stadt ein.");
+    if (data.length === 0) {
+      alert("Kein Ort gefunden.");
       return;
     }
 
-    searchButton.disabled = true;
-    searchButton.textContent = "Sucht...";
-    results.style.display = "none";
+    searchResults = data;
     results.innerHTML = "";
 
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`;
-
-    try {
-      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
-      const data = await response.json();
-
-      if (data.length === 0) {
-        alert("Kein Ort gefunden.");
-        resetSearchButton();
-        return;
-      }
-
-      searchResults = data;
-      if (data.length === 1) {
-        centerMap(data[0]);
-      } else {
-        data.forEach((place, index) => {
-          const option = document.createElement('option');
-          option.value = index;
-          option.text = place.display_name;
-          results.appendChild(option);
-        });
-        results.style.display = "block";
-      }
-    } catch (error) {
-      console.error("Fehler bei der Suche:", error);
-      alert("Fehler bei der Suche. Bitte versuche es später nochmal.");
+    if (data.length === 1) {
+      centerMap(data[0]);
+      results.style.display = "none";
+    } else {
+      data.forEach((place, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.text = place.display_name;
+        results.appendChild(option);
+      });
+      results.style.display = "block";
     }
+  } catch (error) {
+    console.error("Fehler bei der Suche:", error);
+    alert("Fehler bei der Suche. Bitte versuche es später nochmal.");
+  }
+}
 
-    resetSearchButton();
+// Suchergebnis auswählen
+function selectLocation() {
+  const results = document.getElementById('results');
+  const selectedIndex = results.value;
+  const selectedPlace = searchResults[selectedIndex];
+  if (selectedPlace) {
+    centerMap(selectedPlace);
+  }
+}
+
+// Marker setzen
+function centerMap(place) {
+  const lat = parseFloat(place.lat);
+  const lon = parseFloat(place.lon);
+  map.setView([lat, lon], 12);
+
+  if (marker) {
+    map.removeLayer(marker);
+  }
+  marker = L.marker([lat, lon]).addTo(map);
+}
+
+// Suchfeld leeren
+function clearSearch() {
+  document.getElementById('searchInput').value = "";
+  const results = document.getElementById('results');
+  results.style.display = "none";
+  results.innerHTML = "";
+
+  if (marker) {
+    map.removeLayer(marker);
+    marker = null;
+  }
+}
+
+// Oberflächenfilter holen
+function getSelectedSurfaces() {
+  return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
+              .map(cb => cb.value);
+}
+
+// Overpass-Abfrage erstellen
+function buildOverpassQuery(selectedSurfaces) {
+  if (selectedSurfaces.length === 0) return null;
+
+  const bbox = map.getBounds();
+  const south = bbox.getSouth();
+  const west = bbox.getWest();
+  const north = bbox.getNorth();
+  const east = bbox.getEast();
+
+  const knownSurfaces = selectedSurfaces.filter(s => s !== "unbekannt");
+  const includeUnknown = selectedSurfaces.includes("unbekannt");
+
+  let queryParts = [];
+
+  if (knownSurfaces.length > 0) {
+    const surfaceFilter = knownSurfaces.join('|');
+    queryParts.push(`way["highway"]["surface"~"${surfaceFilter}"](${south},${west},${north},${east});`);
   }
 
-  function selectLocation() {
-    const results = document.getElementById('results');
-    const selectedIndex = results.value;
-    const selectedPlace = searchResults[selectedIndex];
-    if (selectedPlace) {
-      centerMap(selectedPlace);
-    }
+  if (includeUnknown) {
+    queryParts.push(`way["highway"]["surface"!~"."](${south},${west},${north},${east});`);
   }
 
-  function centerMap(place) {
-    const lat = parseFloat(place.lat);
-    const lon = parseFloat(place.lon);
-    map.setView([lat, lon], 12);
+  return `
+    [out:json][timeout:25];
+    (
+      ${queryParts.join('\n')}
+    );
+    out geom;
+  `;
+}
 
-    if (marker) {
-      map.removeLayer(marker);
-    }
-    marker = L.marker([lat, lon]).addTo(map);
+// Straßen laden
+async function loadData() {
+  const loadButton = document.getElementById('loadButton');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+
+  const currentZoom = map.getZoom();
+  if (currentZoom <= 13) {
+    alert("Bitte näher heranzoomen! Mindest-Zoomstufe für Datenabruf: 13");
+    return;
   }
 
-  function resetSearchButton() {
-    const searchButton = document.getElementById('searchButton');
-    searchButton.disabled = false;
-    searchButton.textContent = "Suchen";
-  }
+  loadButton.disabled = true;
+  loadingOverlay.style.display = "flex";
 
-  function getSelectedSurfaces() {
-    return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
-                .map(cb => cb.value);
-  }
-
-  function buildOverpassQuery(selectedSurfaces) {
-    if (selectedSurfaces.length === 0) return null;
-
-    const bbox = map.getBounds();
-    const south = bbox.getSouth();
-    const west = bbox.getWest();
-    const north = bbox.getNorth();
-    const east = bbox.getEast();
-
-    const knownSurfaces = selectedSurfaces.filter(s => s !== "unbekannt");
-    const includeUnknown = selectedSurfaces.includes("unbekannt");
-
-    let queryParts = [];
-
-    if (knownSurfaces.length > 0) {
-      const surfaceFilter = knownSurfaces.join('|');
-      queryParts.push(`way["highway"]["surface"~"${surfaceFilter}"](${south},${west},${north},${east});`);
-    }
-
-    if (includeUnknown) {
-      queryParts.push(`way["highway"]["surface"!~"."](${south},${west},${north},${east});`);
-    }
-
-    return `
-      [out:json][timeout:25];
-      (
-        ${queryParts.join('\n')}
-      );
-      out geom;
-    `;
-  }
-
-  async function loadData() {
-    const loadButton = document.getElementById('loadButton');
-    loadButton.disabled = true;
-    loadButton.textContent = "Lädt...";
-
-    const surfaces = getSelectedSurfaces();
-    const query = buildOverpassQuery(surfaces);
-    if (!query) {
-      alert("Bitte mindestens eine Oberfläche auswählen.");
-      resetLoading();
-      return;
-    }
-
-    const servers = [
-      "https://overpass.kumi.systems/api/interpreter",
-      "https://overpass-api.de/api/interpreter"
-    ];
-
-    let data = null;
-
-    for (let server of servers) {
-      try {
-        const response = await fetch(server, {
-          method: "POST",
-          body: query,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
-        });
-        const text = await response.text();
-        data = JSON.parse(text);
-        break;
-      } catch (error) {
-        console.error("Fehler bei Server:", server, error);
-      }
-    }
-
-    if (!data) {
-      alert("Fehler: Keine gültigen Daten von Overpass-Server erhalten.");
-      resetLoading();
-      return;
-    }
-
-    const geojson = overpassToGeoJSON(data);
-
-    if (currentLayer) map.removeLayer(currentLayer);
-
-    currentLayer = L.geoJSON(geojson, {
-      style: feature => ({
-        color: surfaceColor(feature.properties.surface),
-        weight: 3
-      })
-    }).addTo(map);
-
+  const surfaces = getSelectedSurfaces();
+  const query = buildOverpassQuery(surfaces);
+  if (!query) {
+    alert("Bitte mindestens eine Oberfläche auswählen.");
     resetLoading();
+    return;
   }
 
-  function overpassToGeoJSON(data) {
-    const features = data.elements
-      .filter(el => el.type === 'way' && el.geometry)
-      .map(way => ({
-        type: "Feature",
-        properties: {
-          id: way.id,
-          surface: way.tags?.surface || 'unbekannt'
-        },
-        geometry: {
-          type: "LineString",
-          coordinates: way.geometry.map(p => [p.lon, p.lat])
-        }
-      }));
-    return {
-      type: "FeatureCollection",
-      features: features
-    };
+  const servers = [
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass-api.de/api/interpreter"
+  ];
+
+  let data = null;
+
+  for (let server of servers) {
+    try {
+      const response = await fetch(server, {
+        method: "POST",
+        body: query,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+      });
+      const text = await response.text();
+      data = JSON.parse(text);
+      break;
+    } catch (error) {
+      console.error("Fehler bei Server:", server, error);
+    }
   }
 
-  function resetLoading() {
-    const loadButton = document.getElementById('loadButton');
-    loadButton.disabled = false;
-    loadButton.textContent = "Neu laden";
+  if (!data) {
+    alert("Fehler: Keine gültigen Daten von Overpass-Server erhalten.");
+    resetLoading();
+    return;
   }
 
-  function surfaceColor(type) {
-    const colors = {
-      asphalt: "black",
-      gravel: "brown",
-      unpaved: "gray",
-      dirt: "saddlebrown",
-      paved: "green",
-      compacted: "orange",
-      unbekannt: "blue"
-    };
-    return colors[type] || "blue";
-  }
+  const geojson = overpassToGeoJSON(data);
 
-  window.onload = () => {
-    document.getElementById('searchInput').focus();
+  if (currentLayer) map.removeLayer(currentLayer);
+
+  currentLayer = L.geoJSON(geojson, {
+    style: feature => ({
+      color: surfaceColor(feature.properties.surface),
+      weight: 3
+    })
+  }).addTo(map);
+
+  resetLoading();
+}
+
+// Overpass Daten in GeoJSON konvertieren
+function overpassToGeoJSON(data) {
+  const features = data.elements
+    .filter(el => el.type === 'way' && el.geometry)
+    .map(way => ({
+      type: "Feature",
+      properties: {
+        id: way.id,
+        surface: way.tags?.surface || 'unbekannt'
+      },
+      geometry: {
+        type: "LineString",
+        coordinates: way.geometry.map(p => [p.lon, p.lat])
+      }
+    }));
+  return {
+    type: "FeatureCollection",
+    features: features
   };
+}
+
+// Ladeanzeige ausblenden
+function resetLoading() {
+  const loadButton = document.getElementById('loadButton');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  loadButton.disabled = false;
+  loadButton.textContent = "Neu laden";
+  loadingOverlay.style.display = "none";
+}
+
+// Farben für Oberflächen
+function surfaceColor(type) {
+  const colors = {
+    asphalt: "black",
+    gravel: "brown",
+    unpaved: "gray",
+    dirt: "saddlebrown",
+    paved: "green",
+    compacted: "orange",
+    unbekannt: "blue"
+  };
+  return colors[type] || "blue";
+}
+
+// Zoomlevel-Anzeige aktualisieren
+function updateZoomLevel() {
+  const zoomDisplay = document.getElementById('zoomLevel');
+  zoomDisplay.innerText = "Zoom: " + map.getZoom();
+}
+
+map.on('zoomend', updateZoomLevel);
+
+window.onload = () => {
+  document.getElementById('searchInput').focus();
+  updateZoomLevel();
+};
+
 </script>
 
 </body>
