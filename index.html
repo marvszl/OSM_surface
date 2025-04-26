@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>OSM Straßenfilter – für Christoph</title>
+  <title>OSM Straßenfilter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -158,7 +158,15 @@
     <button onclick="searchLocation()">🔍 Suchen</button>
     <button onclick="clearSearch()">🗑️ Löschen</button>
   </div>
+
   <select id="results" onchange="selectLocation()" style="display:none;"></select>
+
+  <hr style="margin:10px 0; width:100%;">
+
+  <input type="text" id="coordInput" placeholder="z.B. 47.086987,15.541183">
+  <div style="display: flex; gap: 5px; margin-top:5px;">
+    <button onclick="goToCoordinates()">🧭 Gehe zu Koordinaten</button>
+  </div>
 </div>
 
 <!-- Erweiterte Filterbox -->
@@ -276,6 +284,44 @@ function toggleFilter() {
   }
   filterVisible = !filterVisible;
 }
+
+function goToCoordinates() {
+  const input = document.getElementById('coordInput').value.trim();
+  
+  if (!input.includes(",")) {
+    alert("Bitte Koordinaten im Format: Breite, Länge eingeben!");
+    return;
+  }
+
+  const parts = input.split(",");
+  if (parts.length !== 2) {
+    alert("Bitte genau zwei Werte eingeben: Breite und Länge, getrennt durch Komma.");
+    return;
+  }
+
+  const lat = parseFloat(parts[0]);
+  const lon = parseFloat(parts[1]);
+
+  if (isNaN(lat) || isNaN(lon)) {
+    alert("Ungültige Zahlenangabe. Bitte überprüfe die Koordinaten.");
+    return;
+  }
+
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    alert("Ungültige Werte: Breite muss zwischen -90 und 90, Länge zwischen -180 und 180 liegen.");
+    return;
+  }
+
+  // Setze Karte
+  map.setView([lat, lon], 14);
+
+  // Setze Marker
+  if (marker) {
+    map.removeLayer(marker);
+  }
+  marker = L.marker([lat, lon]).addTo(map);
+}
+
 
 // Legende ein-/ausblenden
 function toggleLegend() {
