@@ -16,6 +16,7 @@
       z-index: 1100;
       display: flex;
       gap: 5px;
+      flex-wrap: wrap;
     }
     #toggleButtons button {
       background: #0078A8;
@@ -25,6 +26,9 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
     #filter, #legendBox, #searchArea {
@@ -44,10 +48,11 @@
     #filter {
       top: 50px;
       right: 10px;
+      display: none;
     }
     #legendBox {
-      top: 10px;
-      left: 50px;
+      bottom: 10px;
+      left: 10px;
       display: none;
       font-size: 13px;
     }
@@ -78,6 +83,9 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
     #filter label {
@@ -136,18 +144,19 @@
 <body>
 
 <div id="toggleButtons">
-  <button onclick="toggleSearchArea()">Suche</button>
-  <button onclick="toggleFilter()">Filter</button>
-  <button onclick="toggleLegend()">Legende</button>
-  <button onclick="clearMarkers()">Markierungen löschen</button>
-  <button onclick="resetMap()">Zurücksetzen</button>
+  <button onclick="toggleSearchArea()">🔍 Suche</button>
+  <button onclick="toggleFilter()">🛠️ Filter</button>
+  <button onclick="toggleLegend()">📜 Legende</button>
+  <button onclick="clearMarkers()">🗑️ Markierungen löschen</button>
+  <button onclick="resetMap()">🔄 Zurücksetzen</button>
+  <button onclick="loadData()">↻ Daten Laden</button>
 </div>
 
 <div id="searchArea">
   <input type="text" id="searchInput" placeholder="Ort oder Stadt suchen">
   <div style="display: flex; gap: 5px;">
-    <button onclick="searchLocation()">Suchen</button>
-    <button onclick="clearSearch()">Löschen</button>
+    <button onclick="searchLocation()">🔍 Suchen</button>
+    <button onclick="clearSearch()">🗑️ Löschen</button>
   </div>
   <select id="results" onchange="selectLocation()" style="display:none;"></select>
 </div>
@@ -161,8 +170,6 @@
   <label><span class="color-box" style="background:green;"></span><input type="checkbox" value="paved" checked> Gepflastert</label>
   <label><span class="color-box" style="background:orange;"></span><input type="checkbox" value="compacted" checked> Verdichtet</label>
   <label><span class="color-box" style="background:blue;"></span><input type="checkbox" value="unbekannt" checked> Unbekannt</label>
-
-  <button id="loadButton" onclick="loadData()" style="margin-top:10px; width:100%;">Neu laden</button>
 </div>
 
 <div id="legendBox">
@@ -184,8 +191,8 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Dein JavaScript kommt im nächsten Schritt (zu lang für eine Nachricht) 🚀
-// Schreib einfach "weiter", dann geht's sofort weiter!
+// Hier kommt gleich dein vollständiges neues JavaScript rein!
+// 👉 Sag einfach "weiter", dann schicke ich Teil 2 sofort nach!
 
 const map = L.map('map').setView([48.2583, 13.0333], 10);
 const startPosition = [48.2583, 13.0333];
@@ -378,23 +385,21 @@ function buildOverpassQuery(selectedSurfaces) {
 
 // Straßen laden
 async function loadData() {
-  const loadButton = document.getElementById('loadButton');
   const loadingOverlay = document.getElementById('loadingOverlay');
 
   const currentZoom = map.getZoom();
   if (currentZoom < 13) {
-    alert("Bitte näher heranzoomen! Mindest-Zoomstufe für Datenabruf: 14");
+    alert("Bitte näher heranzoomen! Mindest-Zoomstufe für Datenabruf: 13");
     return;
   }
 
-  loadButton.disabled = true;
   loadingOverlay.style.display = "flex";
 
   const surfaces = getSelectedSurfaces();
   const query = buildOverpassQuery(surfaces);
   if (!query) {
     alert("Bitte mindestens eine Oberfläche auswählen.");
-    resetLoading();
+    loadingOverlay.style.display = "none";
     return;
   }
 
@@ -422,7 +427,7 @@ async function loadData() {
 
   if (!data) {
     alert("Fehler: Keine gültigen Daten von Overpass-Server erhalten.");
-    resetLoading();
+    loadingOverlay.style.display = "none";
     return;
   }
 
@@ -437,7 +442,7 @@ async function loadData() {
     })
   }).addTo(map);
 
-  resetLoading();
+  loadingOverlay.style.display = "none";
 }
 
 // Overpass Daten in GeoJSON konvertieren
@@ -459,15 +464,6 @@ function overpassToGeoJSON(data) {
     type: "FeatureCollection",
     features: features
   };
-}
-
-// Ladeanzeige ausblenden
-function resetLoading() {
-  const loadButton = document.getElementById('loadButton');
-  const loadingOverlay = document.getElementById('loadingOverlay');
-  loadButton.disabled = false;
-  loadButton.textContent = "Neu laden";
-  loadingOverlay.style.display = "none";
 }
 
 // Farben für Oberflächen
