@@ -126,6 +126,7 @@
       font-family: sans-serif;
       font-size: 18px;
     }
+
     #loadingSpinner {
       border: 4px solid #f3f3f3;
       border-top: 4px solid #0078A8;
@@ -143,14 +144,17 @@
 </head>
 <body>
 
-<div id="toggleButtons">
-  <button onclick="toggleSearchArea()">🔍 Suche</button>
-  <button onclick="toggleFilter()">🛠️ Filter</button>
-  <button onclick="toggleLegend()">📜 Legende</button>
-  <button onclick="clearMarkers()">🗑️ Markierungen löschen</button>
-  <button onclick="resetMap()">🔄 Zurücksetzen</button>
-  <button onclick="loadData()">↻ Daten Laden</button>
-</div>
+  <div id="toggleButtons">
+    <button onclick="toggleSearchArea()">🔍 Suche</button>
+    <button onclick="toggleFilter()">🛠️ Filter</button>
+    <button onclick="toggleLegend()">📜 Legende</button>
+    <button onclick="clearMarkers()">🗑️ Markierungen</button>
+    <button onclick="resetMap()">🔄 Zurücksetzen</button>
+    <button onclick="loadData()">↻ Neu laden</button>
+    <button onclick="enableStartSet()">🟩 Start</button>
+    <button onclick="enableEndSet()">🏁 Ziel</button>
+    <button onclick="planRoute()">🧭 Route planen</button>
+  </div>
 
 <div id="searchArea">
   <input type="text" id="searchInput" placeholder="Ort oder Stadt suchen">
@@ -234,10 +238,13 @@
 <div id="map"></div>
 <div id="zoomLevel">Zoom: 10</div>
 <div id="loadingOverlay">
+  
   <div id="loadingSpinner"></div>
   Lädt Daten...
 </div>
-
+<div id="routingOverlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background: rgba(255,255,255,0.7); z-index: 2500; align-items: center; justify-content: center; font-family: sans-serif; font-size: 20px;">
+  <div>🚦 Plane Route... Bitte warten!</div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // Hier kommt gleich dein vollständiges neues JavaScript rein!
@@ -284,6 +291,182 @@ function toggleFilter() {
   }
   filterVisible = !filterVisible;
 }
+
+//***************************
+
+let settingStart = false;
+let settingEnd = false;
+let startMarker = null;
+let endMarker = null;
+let routeLine = null;
+
+// Icons definieren
+const startIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
+
+const endIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149059.png',
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32]
+});
+
+// Start setzen aktivieren
+function enableStartSet() {
+  settingStart = true;
+  settingEnd = false;
+  alert("Bitte klicke auf die Karte, um den Startpunkt zu setzen!");
+}
+
+// Ziel setzen aktivieren
+function enableEndSet() {
+  settingEnd = true;
+  settingStart = false;
+  alert("Bitte klicke auf die Karte, um den Zielpunkt zu setzen!");
+}
+
+// Klick auf Karte
+map.on('click', function(e) {
+  const { lat, lng } = e.latlng;
+
+  if (settingStart) {
+    if (startMarker) map.removeLayer(startMarker);
+    startMarker = L.marker([lat, lng], { icon: startIcon }).addTo(map);
+    startMarker.bindPopup(`Start: ${lat.toFixed(14)}, ${lng.toFixed(14)}`).openPopup();
+    settingStart = false;
+  } else if (settingEnd) {
+    if (endMarker) map.removeLayer(endMarker);
+    endMarker = L.marker([lat, lng], { icon: endIcon }).addTo(map);
+    endMarker.bindPopup(`Ziel: ${lat.toFixed(14)}, ${lng.toFixed(14)}`).openPopup();
+    settingEnd = false;
+  }
+});
+
+// Route planen
+async function planRoute() {
+  if (!startMarker || !endMarker) {
+    alert("Bitte zuerst Start- und Zielpunkt setzen!");
+    return;
+  }
+  if (!currentLayer) {
+    alert("Bitte zuerst Straßen mit 'Neu laden' laden!");
+    return;
+  }
+
+  document.getElementById('routingOverlay').style.display = 'flex';
+
+  const startLatLng = startMarker.getLatLng();
+  const endLatLng = endMarker.getLatLng();
+
+  const nodes = {}; // Graph-Knoten
+  const edges = {}; // Graph-Kanten
+
+  // Alle Straßenstücke in Knoten und Kanten umwandeln
+  currentLayer.eachLayer(layer => {
+    if (layer.feature && layer.feature.geometry && layer.feature.geometry.type === "LineString") {
+      const coords = layer.feature.geometry.coordinates;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = `${coords[i][1]},${coords[i][0]}`;
+        const b = `${coords[i + 1][1]},${coords[i + 1][0]}`;
+        const dist = map.distance([coords[i][1], coords[i][0]], [coords[i + 1][1], coords[i + 1][0]]);
+        
+        if (!nodes[a]) nodes[a] = [];
+        if (!nodes[b]) nodes[b] = [];
+
+        nodes[a].push({ node: b, dist });
+        nodes[b].push({ node: a, dist });
+      }
+    }
+  });
+
+  // Hilfsfunktion: nächsten Knoten im Graphen finden
+  function findClosestNode(latlng) {
+    let closest = null;
+    let minDist = Infinity;
+    for (let key in nodes) {
+      const parts = key.split(",");
+      const dist = map.distance(latlng, [parseFloat(parts[0]), parseFloat(parts[1])]);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = key;
+      }
+    }
+    return closest;
+  }
+
+  const startNode = findClosestNode(startLatLng);
+  const endNode = findClosestNode(endLatLng);
+
+  if (!startNode || !endNode) {
+    alert("Start oder Ziel kann nicht an Straßen angeschlossen werden!");
+    document.getElementById('routingOverlay').style.display = 'none';
+    return;
+  }
+
+  // Dijkstra Algorithmus
+  const queue = new Set(Object.keys(nodes));
+  const distances = {};
+  const previous = {};
+
+  for (let node of queue) {
+    distances[node] = Infinity;
+    previous[node] = null;
+  }
+  distances[startNode] = 0;
+
+  while (queue.size > 0) {
+    let current = null;
+    let minDist = Infinity;
+
+    queue.forEach(node => {
+      if (distances[node] < minDist) {
+        minDist = distances[node];
+        current = node;
+      }
+    });
+
+    if (current === endNode) break;
+    if (minDist === Infinity) break;
+
+    queue.delete(current);
+
+    for (let neighbor of nodes[current]) {
+      const alt = distances[current] + neighbor.dist;
+      if (alt < distances[neighbor.node]) {
+        distances[neighbor.node] = alt;
+        previous[neighbor.node] = current;
+      }
+    }
+  }
+
+  // Pfad aufbauen
+  const path = [];
+  let current = endNode;
+  while (current) {
+    const parts = current.split(",");
+    path.unshift([parseFloat(parts[0]), parseFloat(parts[1])]);
+    current = previous[current];
+  }
+
+  if (path.length === 0) {
+    alert("Keine Route gefunden!");
+    document.getElementById('routingOverlay').style.display = 'none';
+    return;
+  }
+
+  // Route zeichnen
+  if (routeLine) map.removeLayer(routeLine);
+  routeLine = L.polyline([startLatLng, ...path, endLatLng], { color: 'red', weight: 4 }).addTo(map);
+
+  document.getElementById('routingOverlay').style.display = 'none';
+}
+
+//***************************
+
 
 function goToCoordinates() {
   const input = document.getElementById('coordInput').value.trim();
