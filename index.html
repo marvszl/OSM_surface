@@ -323,75 +323,46 @@ async function findRandomLandPoint() {
   loadingOverlay.style.display = "flex";
 
   while (tries < maxTries) {
+    // Update der Ladeanzeige
     loadingOverlay.innerHTML = `
       <div id="loadingSpinner"></div>
       Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
     `;
 
-    const lat = Math.random() * 170 - 85;
-    const lon = Math.random() * 360 - 180;
+    const lat = Math.random() * 170 - 85;  // -85 bis +85
+    const lon = Math.random() * 360 - 180; // -180 bis +180
 
     try {
-      // 1. Reverse-Geocoding für Land
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
-      const reverseResponse = await fetch(reverseUrl, { headers: { 'Accept-Language': 'de' } });
-      const reverseData = await reverseResponse.json();
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      const data = await response.json();
 
-      if (reverseData.address && reverseData.address.country) {
-        const country = reverseData.address.country;
-        console.log("Gefundenes Land:", country);
-
-        // 2. Hauptstadt im Land suchen
-        const overpassQuery = `
-          [out:json][timeout:30];
-          area["name"="${country}"]->.searchArea;
-          (
-            node["place"="city"]["capital"~"yes|2"](area.searchArea);
-          );
-          out center tags;
-        `;
-        const overpassUrl = "https://overpass-api.de/api/interpreter";
-        const overpassResponse = await fetch(overpassUrl, {
-          method: "POST",
-          body: overpassQuery,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
-        });
-        const cityData = await overpassResponse.json();
-
-        if (cityData.elements && cityData.elements.length > 0) {
-          const capitalCity = cityData.elements[0]; // Erster Treffer
-          const cityLat = capitalCity.lat || capitalCity.center.lat;
-          const cityLon = capitalCity.lon || capitalCity.center.lon;
-          const cityName = capitalCity.tags.name || "Unbekannte Hauptstadt";
-
-          if (marker) {
-            map.removeLayer(marker);
-          }
-
-          map.setView([cityLat, cityLon], 10);
-
-          marker = L.marker([cityLat, cityLon]).addTo(map);
-          marker.bindPopup(`
-            🏛️ <strong>${cityName}</strong><br><br>
-            🏳️ Land: ${country}
-          `).openPopup();
-
-          loadingOverlay.style.display = "none";
-
-          // ✅ Erfolgsmeldung
-          showSuccessMessage("✅ Hauptstadt gefunden!");
-          return;
+      if (data.address && data.address.country) {
+        // Land gefunden!
+        if (marker) {
+          map.removeLayer(marker);
         }
+        map.setView([lat, lon], 8);
+
+        marker = L.marker([lat, lon]).addTo(map);
+        marker.bindPopup(`
+          🎯 <strong>Zufälliger Punkt gefunden!</strong><br><br>
+          📍 <strong>Koordinaten:</strong> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+          🏳️ <strong>Land:</strong> ${data.address.country}
+        `).openPopup();
+
+        loadingOverlay.style.display = "none";
+        return;
       }
     } catch (err) {
-      console.error("Fehler bei Abfrage:", err);
+      console.error("Fehler bei Reverse-Geocoding:", err);
     }
 
     tries++;
   }
 
   loadingOverlay.style.display = "none";
-  alert("Keine passende Hauptstadt gefunden. Bitte erneut versuchen.");
+  alert("Kein Land gefunden. Bitte erneut versuchen.");
 }
 
   
