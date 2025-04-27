@@ -30,6 +30,20 @@ function toggleSearchArea() {
   }
   searchVisible = !searchVisible;
 }
+//Merkierungen löschen
+function clearMarkers() {
+  // Straßenlayer entfernen
+  if (currentLayer) {
+    map.removeLayer(currentLayer);
+    currentLayer = null;
+  }
+  // Einzelnen Marker entfernen (z.B. durch Klick gesetzt)
+  if (marker) {
+    map.removeLayer(marker);
+    marker = null;
+  }
+}
+
 
 // Karte: Klick für Marker mit kopierbaren Koordinaten
 map.on('click', function(e) {
