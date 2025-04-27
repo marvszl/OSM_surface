@@ -321,9 +321,14 @@ async function findRandomLandPoint() {
 
   const loadingOverlay = document.getElementById('loadingOverlay');
   loadingOverlay.style.display = "flex";
-  loadingOverlay.innerHTML = '<div id="loadingSpinner"></div>Suche zufälligen Punkt...';
 
   while (tries < maxTries) {
+    // Update der Ladeanzeige
+    loadingOverlay.innerHTML = `
+      <div id="loadingSpinner"></div>
+      Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
+    `;
+
     const lat = Math.random() * 170 - 85;  // -85 bis +85
     const lon = Math.random() * 360 - 180; // -180 bis +180
 
@@ -337,10 +342,14 @@ async function findRandomLandPoint() {
         if (marker) {
           map.removeLayer(marker);
         }
-        map.setView([lat, lon], 8); // Schöner Zoom aufs Land
+        map.setView([lat, lon], 8);
 
         marker = L.marker([lat, lon]).addTo(map);
-        marker.bindPopup(`🎯 Zufälliger Punkt:<br>${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Land: ${data.address.country}`).openPopup();
+        marker.bindPopup(`
+          🎯 <strong>Zufälliger Punkt gefunden!</strong><br><br>
+          📍 <strong>Koordinaten:</strong> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+          🏳️ <strong>Land:</strong> ${data.address.country}
+        `).openPopup();
 
         loadingOverlay.style.display = "none";
         return;
