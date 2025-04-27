@@ -31,6 +31,42 @@ function toggleSearchArea() {
   searchVisible = !searchVisible;
 }
 
+// Karte: Klick für Marker mit kopierbaren Koordinaten
+map.on('click', function(e) {
+  const { lat, lng } = e.latlng;
+
+  // Entferne alten Marker, falls vorhanden
+  if (marker) {
+    map.removeLayer(marker);
+  }
+
+  marker = L.marker([lat, lng]).addTo(map);
+
+  const coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+  const popupContent = `
+    <div style="display: flex; align-items: center; gap: 5px;">
+      <span id="coordText">${coords}</span>
+      <button onclick="copyCoordinates()" title="Koordinaten kopieren" style="background:none; border:none; cursor:pointer;">📋</button>
+    </div>
+  `;
+
+  marker.bindPopup(popupContent).openPopup();
+});
+
+// Funktion zum Kopieren der Koordinaten
+function copyCoordinates() {
+  const coordText = document.getElementById('coordText').innerText;
+  navigator.clipboard.writeText(coordText)
+    .then(() => {
+      alert("Koordinaten kopiert!");
+    })
+    .catch(err => {
+      console.error("Fehler beim Kopieren:", err);
+    });
+}
+
+
 // Filterbox ein-/ausblenden
 function toggleFilter() {
   const filter = document.getElementById('filter');
