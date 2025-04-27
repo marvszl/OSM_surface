@@ -44,6 +44,65 @@ function clearMarkers() {
   }
 }
 
+//Ort suchen
+
+async function searchLocation() {
+  const input = document.getElementById('searchInput').value.trim();
+  const results = document.getElementById('results');
+
+  if (!input) {
+    alert("Bitte gib einen Ort oder eine Stadt ein.");
+    return;
+  }
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`;
+
+  try {
+    const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+    const data = await response.json();
+
+    if (data.length === 0) {
+      alert("Kein Ort gefunden.");
+      return;
+    }
+
+    searchResults = data;
+    results.innerHTML = "";
+
+    if (data.length === 1) {
+      centerMap(data[0]);
+      results.style.display = "none";
+    } else {
+      data.forEach((place, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.text = place.display_name;
+        results.appendChild(option);
+      });
+      results.style.display = "block";
+    }
+  } catch (error) {
+    console.error("Fehler bei der Suche:", error);
+    alert("Fehler bei der Suche. Bitte versuche es später nochmal.");
+  }
+}
+
+
+
+//Karte zentrieren auf gefundenen Ort
+
+function centerMap(place) {
+  const lat = parseFloat(place.lat);
+  const lon = parseFloat(place.lon);
+  map.setView([lat, lon], 12);
+
+  if (marker) {
+    map.removeLayer(marker);
+  }
+  marker = L.marker([lat, lon]).addTo(map);
+}
+
+
 
 // Karte: Klick für Marker mit kopierbaren Koordinaten
 map.on('click', function(e) {
