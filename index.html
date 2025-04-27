@@ -332,7 +332,7 @@ async function findRandomLandPoint() {
     const lon = Math.random() * 360 - 180;
 
     try {
-      // 1. Land ermitteln
+      // 1. Reverse-Geocoding für Land
       const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
       const reverseResponse = await fetch(reverseUrl, { headers: { 'Accept-Language': 'de' } });
       const reverseData = await reverseResponse.json();
@@ -341,14 +341,14 @@ async function findRandomLandPoint() {
         const country = reverseData.address.country;
         console.log("Gefundenes Land:", country);
 
-        // 2. Städte im Land suchen
+        // 2. Hauptstadt im Land suchen
         const overpassQuery = `
           [out:json][timeout:30];
           area["name"="${country}"]->.searchArea;
           (
-            node["place"="city"](area.searchArea);
+            node["place"="city"]["capital"~"yes|2"](area.searchArea);
           );
-          out body;
+          out center tags;
         `;
         const overpassUrl = "https://overpass-api.de/api/interpreter";
         const overpassResponse = await fetch(overpassUrl, {
@@ -359,17 +359,10 @@ async function findRandomLandPoint() {
         const cityData = await overpassResponse.json();
 
         if (cityData.elements && cityData.elements.length > 0) {
-          // Größte Stadt anhand Bevölkerung finden
-          const sortedCities = cityData.elements.sort((a, b) => {
-            const popA = parseInt(a.tags.population) || 0;
-            const popB = parseInt(b.tags.population) || 0;
-            return popB - popA;
-          });
-
-          const biggestCity = sortedCities[0];
-          const cityLat = biggestCity.lat;
-          const cityLon = biggestCity.lon;
-          const cityName = biggestCity.tags.name || "Unbekannte Stadt";
+          const capitalCity = cityData.elements[0]; // Erster Treffer
+          const cityLat = capitalCity.lat || capitalCity.center.lat;
+          const cityLon = capitalCity.lon || capitalCity.center.lon;
+          const cityName = capitalCity.tags.name || "Unbekannte Hauptstadt";
 
           if (marker) {
             map.removeLayer(marker);
@@ -379,14 +372,14 @@ async function findRandomLandPoint() {
 
           marker = L.marker([cityLat, cityLon]).addTo(map);
           marker.bindPopup(`
-            🏙️ <strong>${cityName}</strong><br><br>
+            🏛️ <strong>${cityName}</strong><br><br>
             🏳️ Land: ${country}
           `).openPopup();
 
           loadingOverlay.style.display = "none";
 
           // ✅ Erfolgsmeldung
-          showSuccessMessage("✅ Stadt gefunden!");
+          showSuccessMessage("✅ Hauptstadt gefunden!");
           return;
         }
       }
@@ -398,13 +391,13 @@ async function findRandomLandPoint() {
   }
 
   loadingOverlay.style.display = "none";
-  alert("Keine passende Stadt gefunden. Bitte erneut versuchen.");
+  alert("Keine passende Hauptstadt gefunden. Bitte erneut versuchen.");
 }
 
   
 //***************************
 
- function showSuccessMessage(text) {
+function showSuccessMessage(text) {
   const successDiv = document.createElement("div");
   successDiv.style.position = "fixed";
   successDiv.style.top = "20px";
