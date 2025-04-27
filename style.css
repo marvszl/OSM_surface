@@ -41,6 +41,13 @@ body, html { margin: 0; padding: 0; height: 100%; }
   transition: all 0.3s ease;
 }
 #filter { top: 50px; right: 10px; display: none; }
+/* Filter-Checkboxen untereinander anzeigen */
+#filter label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
 #legendBox { bottom: 10px; left: 10px; display: none; font-size: 13px; }
 #searchArea { top: 10px; left: 50px; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
 
