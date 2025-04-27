@@ -87,6 +87,22 @@ async function searchLocation() {
   }
 }
 
+//Ort aus Dropdown verwenden
+
+function selectLocation() {
+  const results = document.getElementById('results');
+  const selectedIndex = results.value;
+
+  if (selectedIndex === "") {
+    return; // Falls nichts ausgewählt wurde
+  }
+
+  const selectedPlace = searchResults[selectedIndex];
+  if (selectedPlace) {
+    centerMap(selectedPlace);
+  }
+}
+
 
 
 //Karte zentrieren auf gefundenen Ort
