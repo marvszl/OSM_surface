@@ -323,7 +323,6 @@ async function findRandomLandPoint() {
   loadingOverlay.style.display = "flex";
 
   while (tries < maxTries) {
-    // Update Ladeanzeige
     loadingOverlay.innerHTML = `
       <div id="loadingSpinner"></div>
       Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
@@ -333,7 +332,7 @@ async function findRandomLandPoint() {
     const lon = Math.random() * 360 - 180;
 
     try {
-      // 1. Reverse-Geocoding für Land
+      // 1. Land ermitteln
       const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
       const reverseResponse = await fetch(reverseUrl, { headers: { 'Accept-Language': 'de' } });
       const reverseData = await reverseResponse.json();
@@ -342,14 +341,14 @@ async function findRandomLandPoint() {
         const country = reverseData.address.country;
         console.log("Gefundenes Land:", country);
 
-        // 2. Alle Flughäfen weltweit laden (nur große Airports)
+        // 2. Städte im Land suchen
         const overpassQuery = `
-          [out:json][timeout:60];
+          [out:json][timeout:30];
+          area["name"="${country}"]->.searchArea;
           (
-            node["aeroway"="airport"];
-            way["aeroway"="airport"];
+            node["place"="city"](area.searchArea);
           );
-          out center tags;
+          out body;
         `;
         const overpassUrl = "https://overpass-api.de/api/interpreter";
         const overpassResponse = await fetch(overpassUrl, {
@@ -357,43 +356,37 @@ async function findRandomLandPoint() {
           body: overpassQuery,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
         });
-        const airportData = await overpassResponse.json();
+        const cityData = await overpassResponse.json();
 
-        // 3. Flughäfen filtern
-        const matchingAirports = airportData.elements.filter(airport => {
-          if (!airport.tags) return false;
-          if (!airport.tags.name) return false;
-          if (!airport.tags["addr:country"]) return false;
-          return airport.tags["addr:country"].toLowerCase() === country.toLowerCase();
-        });
+        if (cityData.elements && cityData.elements.length > 0) {
+          // Größte Stadt anhand Bevölkerung finden
+          const sortedCities = cityData.elements.sort((a, b) => {
+            const popA = parseInt(a.tags.population) || 0;
+            const popB = parseInt(b.tags.population) || 0;
+            return popB - popA;
+          });
 
-        if (matchingAirports.length > 0) {
-          // IATA bevorzugen
-          const airportWithIATA = matchingAirports.find(el => el.tags.iata);
-          let selectedAirport = airportWithIATA || matchingAirports[0];
-
-          const airportLat = selectedAirport.lat || selectedAirport.center.lat;
-          const airportLon = selectedAirport.lon || selectedAirport.center.lon;
-          const airportName = selectedAirport.tags.name || "Unbekannter Flughafen";
-          const iataCode = selectedAirport.tags.iata || "IATA unbekannt";
+          const biggestCity = sortedCities[0];
+          const cityLat = biggestCity.lat;
+          const cityLon = biggestCity.lon;
+          const cityName = biggestCity.tags.name || "Unbekannte Stadt";
 
           if (marker) {
             map.removeLayer(marker);
           }
 
-          map.setView([airportLat, airportLon], 10);
+          map.setView([cityLat, cityLon], 10);
 
-          marker = L.marker([airportLat, airportLon]).addTo(map);
+          marker = L.marker([cityLat, cityLon]).addTo(map);
           marker.bindPopup(`
-            ✈️ <strong>${iataCode} – ${airportName}</strong><br><br>
-            📍 Koordinaten: ${airportLat.toFixed(5)}, ${airportLon.toFixed(5)}<br>
+            🏙️ <strong>${cityName}</strong><br><br>
             🏳️ Land: ${country}
           `).openPopup();
 
           loadingOverlay.style.display = "none";
 
-          // ✅ Erfolgsmeldung kurz anzeigen
-          showSuccessMessage("✅ Flughafen gefunden!");
+          // ✅ Erfolgsmeldung
+          showSuccessMessage("✅ Stadt gefunden!");
           return;
         }
       }
@@ -405,7 +398,7 @@ async function findRandomLandPoint() {
   }
 
   loadingOverlay.style.display = "none";
-  alert("Kein passender Flughafen gefunden. Bitte erneut versuchen.");
+  alert("Keine passende Stadt gefunden. Bitte erneut versuchen.");
 }
 
   
