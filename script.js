@@ -1,25 +1,24 @@
-// Initialisiere die Karte und setze Startposition und Zoomstufe
+// Karte initialisieren
 const map = L.map('map').setView([48.2583, 13.0333], 10);
-
-// Merke dir die Startposition und Zoom für späteres Zurücksetzen
 const startPosition = [48.2583, 13.0333];
 const startZoom = 10;
 
-// Lade die OpenStreetMap-Kacheln in die Karte
+// TileLayer von OpenStreetMap hinzufügen
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
   attribution: '&copy; OpenStreetMap-Mitwirkende'
 }).addTo(map);
 
-// Globale Variablen vorbereiten
-let currentLayer;    // für die geladenen Straßen (GeoJSON)
-let searchResults = []; // für die Suchergebnisse aus Nominatim
-let marker;          // für gesetzte Marker auf der Karte
-let filterVisible = true;  // Status, ob Filterbox sichtbar ist
-let legendVisible = false; // Status, ob Legendenbox sichtbar ist
-let searchVisible = true;  // Status, ob Suchfeld sichtbar ist
+// Variablen
+let currentLayer;
+let searchResults = [];
+let marker;
+let filterVisible = true;
+let legendVisible = false;
+let searchVisible = true;
 
-// Funktion: Suchbereich ein- oder ausblenden
+// -------------------------------------------
+// Suchbereich ein-/ausblenden
 function toggleSearchArea() {
   const searchArea = document.getElementById('searchArea');
   if (searchVisible) {
@@ -32,7 +31,7 @@ function toggleSearchArea() {
   searchVisible = !searchVisible;
 }
 
-// Funktion: Filterbereich ein- oder ausblenden
+// Filterbox ein-/ausblenden
 function toggleFilter() {
   const filter = document.getElementById('filter');
   if (filterVisible) {
@@ -45,186 +44,7 @@ function toggleFilter() {
   filterVisible = !filterVisible;
 }
 
-
-// Funktion: aktuellen Standort des Benutzers finden
-function locateUser() {
-  if (!navigator.geolocation) {
-    alert("Dein Browser unterstützt keine Standortabfrage.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(position => {
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-
-    // Karte auf Benutzerposition zentrieren
-    map.setView([lat, lon], 14);
-
-    // Marker setzen mit Popup "Dein aktueller Standort"
-    L.marker([lat, lon]).addTo(map)
-      .bindPopup("📍 Dein aktueller Standort")
-      .openPopup();
-
-  }, error => {
-    alert("Standort konnte nicht ermittelt werden.");
-    console.error(error);
-  });
-}
-
-// Funktion: zufälligen Punkt auf Land finden
-async function findRandomLandPoint() {
-  const maxTries = 10;
-  let tries = 0;
-
-  const loadingOverlay = document.getElementById('loadingOverlay');
-  loadingOverlay.style.display = "flex";
-
-  while (tries < maxTries) {
-    // Ladeanzeige aktualisieren
-    loadingOverlay.innerHTML = `
-      <div id="loadingSpinner"></div>
-      Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
-    `;
-
-    // Zufällige Koordinaten erzeugen
-    const lat = Math.random() * 170 - 85;  // -85 bis +85 (Breitengrad)
-    const lon = Math.random() * 360 - 180; // -180 bis +180 (Längengrad)
-
-    try {
-      // Reverse-Geocoding (Adresse anhand von Koordinaten abfragen)
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
-      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
-      const data = await response.json();
-
-      if (data.address && data.address.country) {
-        // Wenn ein Land gefunden wurde, Marker setzen
-
-        if (marker) {
-          map.removeLayer(marker);
-        }
-
-        map.setView([lat, lon], 8); // auf Punkt zoomen
-
-        marker = L.marker([lat, lon]).addTo(map);
-        marker.bindPopup(`
-          🎯 <strong>Zufälliger Punkt gefunden!</strong><br><br>
-          📍 <strong>Koordinaten:</strong> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
-          🏳️ <strong>Land:</strong> ${data.address.country}
-        `).openPopup();
-
-        loadingOverlay.style.display = "none";
-        return;
-      }
-    } catch (err) {
-      console.error("Fehler bei Reverse-Geocoding:", err);
-    }
-
-    tries++;
-  }
-
-  // Nach maxTries kein Land gefunden
-  loadingOverlay.style.display = "none";
-  alert("Kein Land gefunden. Bitte erneut versuchen.");
-}
-
-// Funktion: kleine grüne Erfolgsmeldung anzeigen
-function showSuccessMessage(text) {
-  const successDiv = document.createElement("div");
-  successDiv.style.position = "fixed";
-  successDiv.style.top = "20px";
-  successDiv.style.left = "50%";
-  successDiv.style.transform = "translateX(-50%)";
-  successDiv.style.background = "#28a745";
-  successDiv.style.color = "white";
-  successDiv.style.padding = "10px 20px";
-  successDiv.style.borderRadius = "6px";
-  successDiv.style.fontFamily = "sans-serif";
-  successDiv.style.fontSize = "16px";
-  successDiv.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)";
-  successDiv.style.zIndex = 5000;
-  successDiv.innerText = text;
-  document.body.appendChild(successDiv);
-
-  // Erfolgsmeldung verschwindet nach 2,5 Sekunden
-  setTimeout(() => {
-    successDiv.remove();
-  }, 2500);
-}
-// Funktion: Springe zu bestimmten Koordinaten (aus Eingabefeld)
-function goToCoordinates() {
-  const input = document.getElementById('coordInput').value.trim();
-  
-  // Eingabe prüfen: muss ein Komma enthalten
-  if (!input.includes(",")) {
-    alert("Bitte Koordinaten im Format: Breite, Länge eingeben!");
-    return;
-  }
-
-  const parts = input.split(",");
-  if (parts.length !== 2) {
-    alert("Bitte genau zwei Werte eingeben: Breite und Länge, getrennt durch Komma.");
-    return;
-  }
-
-  // Breiten- und Längengrad extrahieren und in Zahlen umwandeln
-  const lat = parseFloat(parts[0]);
-  const lon = parseFloat(parts[1]);
-
-  if (isNaN(lat) || isNaN(lon)) {
-    alert("Ungültige Zahlenangabe. Bitte überprüfe die Koordinaten.");
-    return;
-  }
-
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-    alert("Ungültige Werte: Breite muss zwischen -90 und 90, Länge zwischen -180 und 180 liegen.");
-    return;
-  }
-
-  // Karte auf eingegebene Koordinaten verschieben
-  map.setView([lat, lon], 14);
-
-  // Vorherigen Marker löschen und neuen Marker setzen
-  if (marker) {
-    map.removeLayer(marker);
-  }
-  marker = L.marker([lat, lon]).addTo(map);
-}
-
-// Ereignis: Klick auf Karte → Marker mit Koordinaten setzen
-map.on('click', function(e) {
-  const { lat, lng } = e.latlng;
-
-  // Vorherigen Marker löschen
-  if (marker) {
-    map.removeLayer(marker);
-  }
-
-  // Neuen Marker setzen
-  marker = L.marker([lat, lng]).addTo(map);
-
-  const coords = `${lat.toFixed(14)}, ${lng.toFixed(14)}`; // sehr genau!
-
-  // Popup mit Koordinaten + Kopierbutton
-  const popupContent = `
-    <div style="display: flex; align-items: center; gap: 5px;">
-      <span id="coordText">${coords}</span>
-      <button onclick="copyCoordinates()" title="Kopieren" style="background:none; border:none; cursor:pointer;">📋</button>
-    </div>
-  `;
-
-  marker.bindPopup(popupContent).openPopup();
-});
-
-// Funktion: Koordinaten aus Popup kopieren
-function copyCoordinates() {
-  const coordText = document.getElementById('coordText').innerText;
-  navigator.clipboard.writeText(coordText).then(() => {
-    alert("Koordinaten kopiert!");
-  }).catch(err => {
-    console.error("Fehler beim Kopieren:", err);
-  });
-}
-// Funktion: Legendenbox ein- oder ausblenden
+// Legendenbox ein-/ausblenden
 function toggleLegend() {
   const legend = document.getElementById('legendBox');
   if (legendVisible) {
@@ -237,159 +57,96 @@ function toggleLegend() {
   legendVisible = !legendVisible;
 }
 
-// Funktion: Alle Marker und Straßen entfernen
-function clearMarkers() {
-  // Straßenlayer entfernen
-  if (currentLayer) {
-    map.removeLayer(currentLayer);
-    currentLayer = null;
-  }
-  // Einzelnen Marker entfernen
-  if (marker) {
-    map.removeLayer(marker);
-    marker = null;
-  }
-}
-
-// Funktion: Karte auf Startposition und Startzoom zurücksetzen
-function resetMap() {
-  clearMarkers(); // Alles löschen
-  map.setView(startPosition, startZoom); // Startansicht wiederherstellen
-}
-// Funktion: Ort oder Stadt suchen
-async function searchLocation() {
-  const input = document.getElementById('searchInput').value.trim(); // Eingegebenen Text holen
-  const results = document.getElementById('results'); // Dropdown-Menü für Ergebnisse
-
-  if (!input) {
-    alert("Bitte gib einen Ort oder eine Stadt ein.");
+// -------------------------------------------
+// Nutzer-Standort bestimmen
+function locateUser() {
+  if (!navigator.geolocation) {
+    alert("Dein Browser unterstützt keine Standortabfrage.");
     return;
   }
 
-  // Baue die Nominatim-Such-URL
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`;
+  navigator.geolocation.getCurrentPosition(position => {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
 
-  try {
-    const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
-    const data = await response.json();
+    map.setView([lat, lon], 14);
 
-    if (data.length === 0) {
-      alert("Kein Ort gefunden.");
-      return;
+    L.marker([lat, lon]).addTo(map)
+      .bindPopup("📍 Dein aktueller Standort")
+      .openPopup();
+  }, error => {
+    alert("Standort konnte nicht ermittelt werden.");
+    console.error(error);
+  });
+}
+
+// -------------------------------------------
+// Zufälligen Punkt auf Land finden
+async function findRandomLandPoint() {
+  const maxTries = 10;
+  let tries = 0;
+
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  loadingOverlay.style.display = "flex";
+
+  while (tries < maxTries) {
+    loadingOverlay.innerHTML = `
+      <div id="loadingSpinner"></div>
+      Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
+    `;
+
+    const lat = Math.random() * 170 - 85;
+    const lon = Math.random() * 360 - 180;
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      const data = await response.json();
+
+      if (data.address && data.address.country) {
+        if (marker) map.removeLayer(marker);
+
+        map.setView([lat, lon], 8);
+        marker = L.marker([lat, lon]).addTo(map);
+        marker.bindPopup(`
+          🎯 <strong>Zufälliger Punkt gefunden!</strong><br><br>
+          📍 <strong>Koordinaten:</strong> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
+          🏳️ <strong>Land:</strong> ${data.address.country}
+        `).openPopup();
+
+        loadingOverlay.innerHTML = `<div id="loadingSpinner"></div>Lädt Daten...`;
+        loadingOverlay.style.display = "none";
+        return;
+      }
+    } catch (err) {
+      console.error("Fehler bei Reverse-Geocoding:", err);
     }
 
-    searchResults = data; // Speichere Suchergebnisse
-    results.innerHTML = ""; // Dropdown leeren
-
-    if (data.length === 1) {
-      // Wenn nur ein Treffer: Karte direkt auf diesen Ort zentrieren
-      centerMap(data[0]);
-      results.style.display = "none";
-    } else {
-      // Mehrere Treffer: Liste anzeigen
-      data.forEach((place, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.text = place.display_name;
-        results.appendChild(option);
-      });
-      results.style.display = "block";
-    }
-  } catch (error) {
-    console.error("Fehler bei der Suche:", error);
-    alert("Fehler bei der Suche. Bitte versuche es später nochmal.");
-  }
-}
-
-// Funktion: Ort aus der Ergebnisliste auswählen
-function selectLocation() {
-  const results = document.getElementById('results');
-  const selectedIndex = results.value; // Index vom ausgewählten Ort
-  const selectedPlace = searchResults[selectedIndex];
-  if (selectedPlace) {
-    centerMap(selectedPlace);
-  }
-}
-
-// Funktion: Karte auf gewählten Ort zentrieren
-function centerMap(place) {
-  const lat = parseFloat(place.lat);
-  const lon = parseFloat(place.lon);
-
-  map.setView([lat, lon], 12); // Zoome auf den gefundenen Ort
-
-  // Vorhandenen Marker entfernen und neuen setzen
-  if (marker) {
-    map.removeLayer(marker);
-  }
-  marker = L.marker([lat, lon]).addTo(map);
-}
-
-// Funktion: Suchfeld und Suchergebnisse zurücksetzen
-function clearSearch() {
-  document.getElementById('searchInput').value = ""; // Textfeld leeren
-  const results = document.getElementById('results');
-  results.style.display = "none"; // Dropdown verstecken
-  results.innerHTML = "";
-
-  if (marker) {
-    map.removeLayer(marker); // Falls Marker durch Suche gesetzt wurde, entfernen
-    marker = null;
-  }
-}
-// Funktion: Hole die ausgewählten Oberflächenarten aus dem Filter
-function getSelectedSurfaces() {
-  return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
-              .map(cb => cb.value); // Werte der angehakten Checkboxen als Array
-}
-
-// Funktion: Baue eine Overpass-API-Abfrage basierend auf ausgewählten Oberflächen
-function buildOverpassQuery(selectedSurfaces) {
-  if (selectedSurfaces.length === 0) return null; // Wenn keine Oberfläche ausgewählt ist, abbrechen
-
-  // Begrenze die Abfrage auf den aktuell sichtbaren Kartenausschnitt
-  const bbox = map.getBounds();
-  const south = bbox.getSouth();
-  const west = bbox.getWest();
-  const north = bbox.getNorth();
-  const east = bbox.getEast();
-
-  const knownSurfaces = selectedSurfaces.filter(s => s !== "unbekannt");
-  const includeUnknown = selectedSurfaces.includes("unbekannt");
-
-  let queryParts = [];
-
-  // Straßen mit bekannten Oberflächen anfragen
-  if (knownSurfaces.length > 0) {
-    const surfaceFilter = knownSurfaces.join('|'); // z.B. asphalt|gravel|unpaved
-    queryParts.push(`way["highway"]["surface"~"${surfaceFilter}"](${south},${west},${north},${east});`);
+    tries++;
   }
 
-  // Straßen ohne surface-Tag (unbekannte Oberfläche) anfragen
-  if (includeUnknown) {
-    queryParts.push(`way["highway"]["surface"!~"."](${south},${west},${north},${east});`);
-  }
-
-  return `
-    [out:json][timeout:25];
-    (
-      ${queryParts.join('\n')}
-    );
-    out geom;
-  `;
+  loadingOverlay.innerHTML = `<div id="loadingSpinner"></div>Lädt Daten...`;
+  loadingOverlay.style.display = "none";
+  alert("Kein Land gefunden. Bitte erneut versuchen.");
 }
 
-// Funktion: Lade Straßendaten von Overpass API und zeichne sie auf der Karte
+// -------------------------------------------
+// Straßen laden anhand der Filterauswahl
 async function loadData() {
   const loadingOverlay = document.getElementById('loadingOverlay');
+  
+  loadingOverlay.innerHTML = `
+    <div id="loadingSpinner"></div>
+    Lädt Straßendaten...
+  `;
+  loadingOverlay.style.display = "flex";
 
   const currentZoom = map.getZoom();
   if (currentZoom < 13) {
     alert("Bitte näher heranzoomen! Mindest-Zoomstufe für Datenabruf: 13");
+    loadingOverlay.style.display = "none";
     return;
   }
-
-  loadingOverlay.style.display = "flex"; // Ladeoverlay anzeigen
 
   const surfaces = getSelectedSurfaces();
   const query = buildOverpassQuery(surfaces);
@@ -400,7 +157,6 @@ async function loadData() {
     return;
   }
 
-  // Zwei Overpass-Server als Backup (falls einer nicht geht)
   const servers = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass-api.de/api/interpreter"
@@ -408,7 +164,6 @@ async function loadData() {
 
   let data = null;
 
-  // Probiere die Server der Reihe nach
   for (let server of servers) {
     try {
       const response = await fetch(server, {
@@ -418,7 +173,7 @@ async function loadData() {
       });
       const text = await response.text();
       data = JSON.parse(text);
-      break; // Erfolgreich, also abbrechen
+      break;
     } catch (error) {
       console.error("Fehler bei Server:", server, error);
     }
@@ -432,10 +187,8 @@ async function loadData() {
 
   const geojson = overpassToGeoJSON(data);
 
-  // Vorhandene Layer entfernen
   if (currentLayer) map.removeLayer(currentLayer);
 
-  // Neue Straßen zeichnen
   currentLayer = L.geoJSON(geojson, {
     style: feature => ({
       color: surfaceColor(feature.properties.surface),
@@ -443,32 +196,71 @@ async function loadData() {
     })
   }).addTo(map);
 
-  loadingOverlay.style.display = "none"; // Ladeoverlay ausblenden
+  loadingOverlay.innerHTML = `<div id="loadingSpinner"></div>Lädt Daten...`;
+  loadingOverlay.style.display = "none";
 }
 
-// Funktion: Konvertiere Overpass-Daten in GeoJSON-Format
+// -------------------------------------------
+// Hilfsfunktionen für Overpass-Abfrage
+
+function getSelectedSurfaces() {
+  return Array.from(document.querySelectorAll('#filter input[type=checkbox]:checked'))
+              .map(cb => cb.value);
+}
+
+function buildOverpassQuery(selectedSurfaces) {
+  if (selectedSurfaces.length === 0) return null;
+
+  const bbox = map.getBounds();
+  const south = bbox.getSouth();
+  const west = bbox.getWest();
+  const north = bbox.getNorth();
+  const east = bbox.getEast();
+
+  const knownSurfaces = selectedSurfaces.filter(s => s !== "unbekannt");
+  const includeUnknown = selectedSurfaces.includes("unbekannt");
+
+  let queryParts = [];
+
+  if (knownSurfaces.length > 0) {
+    const surfaceFilter = knownSurfaces.join('|');
+    queryParts.push(`way["highway"]["surface"~"${surfaceFilter}"](${south},${west},${north},${east});`);
+  }
+
+  if (includeUnknown) {
+    queryParts.push(`way["highway"]["surface"!~"."](${south},${west},${north},${east});`);
+  }
+
+  return `
+    [out:json][timeout:25];
+    (
+      ${queryParts.join('\n')}
+    );
+    out geom;
+  `;
+}
+
 function overpassToGeoJSON(data) {
   const features = data.elements
-    .filter(el => el.type === 'way' && el.geometry) // Nur "way"-Elemente mit Geometrie
+    .filter(el => el.type === 'way' && el.geometry)
     .map(way => ({
       type: "Feature",
       properties: {
         id: way.id,
-        surface: way.tags?.surface || 'unbekannt' // Oberfläche merken, sonst "unbekannt"
+        surface: way.tags?.surface || 'unbekannt'
       },
       geometry: {
         type: "LineString",
-        coordinates: way.geometry.map(p => [p.lon, p.lat]) // Koordinaten umdrehen [lon, lat]
+        coordinates: way.geometry.map(p => [p.lon, p.lat])
       }
     }));
-  
+
   return {
     type: "FeatureCollection",
     features: features
   };
 }
 
-// Funktion: Gib Farbe zurück je nach Oberfläche
 function surfaceColor(type) {
   const colors = {
     asphalt: "black",
@@ -495,19 +287,19 @@ function surfaceColor(type) {
     snow: "whitesmoke",
     pebblestone: "lightgray"
   };
-  return colors[type] || "blue"; // Fallback-Farbe blau
+  return colors[type] || "blue";
 }
 
-// Funktion: Zoomlevel-Anzeige unten rechts aktualisieren
+// -------------------------------------------
+// Zoomlevel aktualisieren
 function updateZoomLevel() {
   const zoomDisplay = document.getElementById('zoomLevel');
   zoomDisplay.innerText = "Zoom: " + map.getZoom();
 }
-
-// Event: Wenn Zoom geändert wird → Zoomlevel aktualisieren
 map.on('zoomend', updateZoomLevel);
 
-// Beim ersten Laden: Fokus auf Suchfeld und Zoomlevel setzen
+// -------------------------------------------
+// Beim Laden der Seite
 window.onload = () => {
   document.getElementById('searchInput').focus();
   updateZoomLevel();
