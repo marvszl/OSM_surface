@@ -146,6 +146,7 @@
 
   <div id="toggleButtons">
     <button onclick="locateUser()">📍 Ich</button>
+    <button onclick="findRandomLandPoint()">🎲 Punkt</button>
     <button onclick="toggleSearchArea()">🔍 Suche</button>
     <button onclick="toggleFilter()">🛠️ Filter</button>
     <button onclick="toggleLegend()">📜 Legende</button>
@@ -240,9 +241,7 @@
   <div id="loadingSpinner"></div>
   Lädt Daten...
 </div>
-<div id="routingOverlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background: rgba(255,255,255,0.7); z-index: 2500; align-items: center; justify-content: center; font-family: sans-serif; font-size: 20px;">
-  <div>🚦 Plane Route... Bitte warten!</div>
-</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // Hier kommt gleich dein vollständiges neues JavaScript rein!
@@ -316,7 +315,49 @@ function locateUser() {
 
 //***************************
 
+async function findRandomLandPoint() {
+  const maxTries = 10;
+  let tries = 0;
 
+  const loadingOverlay = document.getElementById('loadingOverlay');
+  loadingOverlay.style.display = "flex";
+  loadingOverlay.innerHTML = '<div id="loadingSpinner"></div>Suche zufälligen Punkt...';
+
+  while (tries < maxTries) {
+    const lat = Math.random() * 170 - 85;  // -85 bis +85
+    const lon = Math.random() * 360 - 180; // -180 bis +180
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+      const data = await response.json();
+
+      if (data.address && data.address.country) {
+        // Land gefunden!
+        if (marker) {
+          map.removeLayer(marker);
+        }
+        map.setView([lat, lon], 8); // Schöner Zoom aufs Land
+
+        marker = L.marker([lat, lon]).addTo(map);
+        marker.bindPopup(`🎯 Zufälliger Punkt:<br>${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Land: ${data.address.country}`).openPopup();
+
+        loadingOverlay.style.display = "none";
+        return;
+      }
+    } catch (err) {
+      console.error("Fehler bei Reverse-Geocoding:", err);
+    }
+
+    tries++;
+  }
+
+  loadingOverlay.style.display = "none";
+  alert("Kein Land gefunden. Bitte erneut versuchen.");
+}
+
+  
+//***************************
 function goToCoordinates() {
   const input = document.getElementById('coordInput').value.trim();
   
