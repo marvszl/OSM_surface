@@ -333,7 +333,7 @@ async function findRandomLandPoint() {
     const lon = Math.random() * 360 - 180;
 
     try {
-      // Reverse-Geocoding für Land
+      // 1. Reverse-Geocoding für Land
       const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
       const reverseResponse = await fetch(reverseUrl, { headers: { 'Accept-Language': 'de' } });
       const reverseData = await reverseResponse.json();
@@ -342,14 +342,14 @@ async function findRandomLandPoint() {
         const country = reverseData.address.country;
         console.log("Gefundenes Land:", country);
 
-        // Suche Flughäfen im Land
+        // 2. Alle Flughäfen weltweit laden (nur große Airports)
         const overpassQuery = `
-          [out:json][timeout:25];
-          area["name"="${country}"]->.searchArea;
+          [out:json][timeout:60];
           (
-            node["aeroway"="airport"](area.searchArea);
+            node["aeroway"="airport"];
+            way["aeroway"="airport"];
           );
-          out body;
+          out center tags;
         `;
         const overpassUrl = "https://overpass-api.de/api/interpreter";
         const overpassResponse = await fetch(overpassUrl, {
@@ -357,19 +357,25 @@ async function findRandomLandPoint() {
           body: overpassQuery,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
         });
-
         const airportData = await overpassResponse.json();
 
-        if (airportData.elements && airportData.elements.length > 0) {
-          // Versuche einen Flughafen mit IATA-Code zu finden
-          const airportWithIATA = airportData.elements.find(el => el.tags && el.tags.iata);
+        // 3. Flughäfen filtern
+        const matchingAirports = airportData.elements.filter(airport => {
+          if (!airport.tags) return false;
+          if (!airport.tags.name) return false;
+          if (!airport.tags["addr:country"]) return false;
+          return airport.tags["addr:country"].toLowerCase() === country.toLowerCase();
+        });
 
-          let selectedAirport = airportWithIATA || airportData.elements[0];
+        if (matchingAirports.length > 0) {
+          // IATA bevorzugen
+          const airportWithIATA = matchingAirports.find(el => el.tags.iata);
+          let selectedAirport = airportWithIATA || matchingAirports[0];
 
-          const airportLat = selectedAirport.lat;
-          const airportLon = selectedAirport.lon;
+          const airportLat = selectedAirport.lat || selectedAirport.center.lat;
+          const airportLon = selectedAirport.lon || selectedAirport.center.lon;
           const airportName = selectedAirport.tags.name || "Unbekannter Flughafen";
-          const iataCode = selectedAirport.tags.iata || "IATA-Code unbekannt";
+          const iataCode = selectedAirport.tags.iata || "IATA unbekannt";
 
           if (marker) {
             map.removeLayer(marker);
@@ -386,7 +392,7 @@ async function findRandomLandPoint() {
 
           loadingOverlay.style.display = "none";
 
-          // ✅ Erfolgsmeldung kurz einblenden
+          // ✅ Erfolgsmeldung kurz anzeigen
           showSuccessMessage("✅ Flughafen gefunden!");
           return;
         }
@@ -401,6 +407,8 @@ async function findRandomLandPoint() {
   loadingOverlay.style.display = "none";
   alert("Kein passender Flughafen gefunden. Bitte erneut versuchen.");
 }
+
+  
 //***************************
 
  function showSuccessMessage(text) {
