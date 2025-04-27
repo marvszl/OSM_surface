@@ -323,48 +323,108 @@ async function findRandomLandPoint() {
   loadingOverlay.style.display = "flex";
 
   while (tries < maxTries) {
-    // Update der Ladeanzeige
+    // Update Ladeanzeige
     loadingOverlay.innerHTML = `
       <div id="loadingSpinner"></div>
       Suche zufälligen Punkt...<br>🔁 Versuch ${tries + 1} von ${maxTries}
     `;
 
-    const lat = Math.random() * 170 - 85;  // -85 bis +85
-    const lon = Math.random() * 360 - 180; // -180 bis +180
+    const lat = Math.random() * 170 - 85;
+    const lon = Math.random() * 360 - 180;
 
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
-      const response = await fetch(url, { headers: { 'Accept-Language': 'de' } });
-      const data = await response.json();
+      // Reverse-Geocoding für Land
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const reverseResponse = await fetch(reverseUrl, { headers: { 'Accept-Language': 'de' } });
+      const reverseData = await reverseResponse.json();
 
-      if (data.address && data.address.country) {
-        // Land gefunden!
-        if (marker) {
-          map.removeLayer(marker);
+      if (reverseData.address && reverseData.address.country) {
+        const country = reverseData.address.country;
+        console.log("Gefundenes Land:", country);
+
+        // Suche Flughäfen im Land
+        const overpassQuery = `
+          [out:json][timeout:25];
+          area["name"="${country}"]->.searchArea;
+          (
+            node["aeroway"="airport"](area.searchArea);
+          );
+          out body;
+        `;
+        const overpassUrl = "https://overpass-api.de/api/interpreter";
+        const overpassResponse = await fetch(overpassUrl, {
+          method: "POST",
+          body: overpassQuery,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }
+        });
+
+        const airportData = await overpassResponse.json();
+
+        if (airportData.elements && airportData.elements.length > 0) {
+          // Versuche einen Flughafen mit IATA-Code zu finden
+          const airportWithIATA = airportData.elements.find(el => el.tags && el.tags.iata);
+
+          let selectedAirport = airportWithIATA || airportData.elements[0];
+
+          const airportLat = selectedAirport.lat;
+          const airportLon = selectedAirport.lon;
+          const airportName = selectedAirport.tags.name || "Unbekannter Flughafen";
+          const iataCode = selectedAirport.tags.iata || "IATA-Code unbekannt";
+
+          if (marker) {
+            map.removeLayer(marker);
+          }
+
+          map.setView([airportLat, airportLon], 10);
+
+          marker = L.marker([airportLat, airportLon]).addTo(map);
+          marker.bindPopup(`
+            ✈️ <strong>${iataCode} – ${airportName}</strong><br><br>
+            📍 Koordinaten: ${airportLat.toFixed(5)}, ${airportLon.toFixed(5)}<br>
+            🏳️ Land: ${country}
+          `).openPopup();
+
+          loadingOverlay.style.display = "none";
+
+          // ✅ Erfolgsmeldung kurz einblenden
+          showSuccessMessage("✅ Flughafen gefunden!");
+          return;
         }
-        map.setView([lat, lon], 8);
-
-        marker = L.marker([lat, lon]).addTo(map);
-        marker.bindPopup(`
-          🎯 <strong>Zufälliger Punkt gefunden!</strong><br><br>
-          📍 <strong>Koordinaten:</strong> ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>
-          🏳️ <strong>Land:</strong> ${data.address.country}
-        `).openPopup();
-
-        loadingOverlay.style.display = "none";
-        return;
       }
     } catch (err) {
-      console.error("Fehler bei Reverse-Geocoding:", err);
+      console.error("Fehler bei Abfrage:", err);
     }
 
     tries++;
   }
 
   loadingOverlay.style.display = "none";
-  alert("Kein Land gefunden. Bitte erneut versuchen.");
+  alert("Kein passender Flughafen gefunden. Bitte erneut versuchen.");
 }
+//***************************
 
+ function showSuccessMessage(text) {
+  const successDiv = document.createElement("div");
+  successDiv.style.position = "fixed";
+  successDiv.style.top = "20px";
+  successDiv.style.left = "50%";
+  successDiv.style.transform = "translateX(-50%)";
+  successDiv.style.background = "#28a745";
+  successDiv.style.color = "white";
+  successDiv.style.padding = "10px 20px";
+  successDiv.style.borderRadius = "6px";
+  successDiv.style.fontFamily = "sans-serif";
+  successDiv.style.fontSize = "16px";
+  successDiv.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)";
+  successDiv.style.zIndex = 5000;
+  successDiv.innerText = text;
+  document.body.appendChild(successDiv);
+
+  setTimeout(() => {
+    successDiv.remove();
+  }, 2500);
+}
+ 
   
 //***************************
 function goToCoordinates() {
