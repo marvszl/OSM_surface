@@ -1,4 +1,4 @@
-/* Grundlegende Layouts */
+/* Grundlegendes Layout */
 body, html {
   margin: 0;
   padding: 0;
@@ -34,7 +34,7 @@ body, html {
   gap: 5px;
 }
 
-/* Filterbox, Suchfeld und Legende */
+/* Filterbox, Suchbereich, Legende */
 #filter, #legendBox, #searchArea {
   position: absolute;
   z-index: 1000;
@@ -67,55 +67,29 @@ body, html {
 #searchArea {
   top: 10px;
   left: 50px;
-  display: none;
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 5px;
 }
 
-/* Versteckte Elemente */
-.hidden {
-  opacity: 0;
-  transform: scale(0.95);
-  pointer-events: none;
-}
-
-/* Eingabefelder und Buttons im Suchbereich */
-
+/* Eingabefelder und Buttons im Suchbereich (iPhone Fix: mind. 16px!) */
 #searchArea input,
 #searchArea select,
 #searchArea button {
-  font-size: 16px; /* Minimum 16px, damit iOS nicht reinzoomt */
-}
-
-#searchArea input,
-#searchArea select {
   width: 220px;
-  font-size: 14px;
+  font-size: 16px; /* Wichtig für iPhone: mindestens 16px, damit kein Zoom */
   padding: 4px;
 }
 
-#searchArea button {
-  background: #0078A8;
-  color: white;
-  border: none;
-  padding: 5px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-/* Filter-Checkboxen */
+/* Filter Checkboxen */
 #filter label {
   display: flex;
   align-items: center;
   margin-bottom: 6px;
 }
 
-/* Farbige Boxen für Oberflächen */
+/* Farbboxen */
 .color-box {
   width: 16px;
   height: 16px;
@@ -166,12 +140,19 @@ body, html {
   100% { transform: rotate(360deg);}
 }
 
-/* ------------------------------
-   Responsive Anpassungen für Mobile Geräte
-   ------------------------------ */
+/* Versteckte Elemente */
+.hidden {
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+}
+
+/* --------------------------------
+   Mobile Optimierungen (bis 768px)
+   -------------------------------- */
 @media (max-width: 768px) {
   
-  /* Buttons oben rechts: Nur noch Icons, quadratisch */
+  /* Buttonleiste */
   #toggleButtons {
     flex-direction: column;
     right: 10px;
@@ -187,12 +168,12 @@ body, html {
     justify-content: center;
   }
 
-  /* Text in Buttons ausblenden */
+  /* Nur Icon auf Mobile */
   #toggleButtons button span {
     display: none;
   }
 
-  /* Suchfeld, Filterbox, Legende etwas kompakter */
+  /* Kompaktere Boxen */
   #searchArea,
   #filter,
   #legendBox {
@@ -200,7 +181,7 @@ body, html {
     font-size: 15px;
   }
 
-  /* Zoomlevel etwas kleiner */
+  /* Zoomlevel kleiner */
   #zoomLevel {
     font-size: 12px;
     padding: 4px 8px;
