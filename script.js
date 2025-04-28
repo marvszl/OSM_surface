@@ -228,6 +228,7 @@ function toggleLegend() {
 
 // -------------------------------------------
 // Nutzer-Standort bestimmen
+
 function locateUser() {
   if (!navigator.geolocation) {
     alert("Dein Browser unterstützt keine Standortabfrage.");
@@ -238,16 +239,24 @@ function locateUser() {
     const lat = position.coords.latitude;
     const lon = position.coords.longitude;
 
-    map.setView([lat, lon], 14);
+    map.setView([lat, lon], 14); // Zoom auf Nutzerposition
 
-    L.marker([lat, lon]).addTo(map)
+    // Alten Marker entfernen, falls vorhanden
+    if (marker) {
+      map.removeLayer(marker);
+    }
+
+    // Neuen Marker setzen und speichern
+    marker = L.marker([lat, lon]).addTo(map)
       .bindPopup("📍 Dein aktueller Standort")
       .openPopup();
+
   }, error => {
     alert("Standort konnte nicht ermittelt werden.");
     console.error(error);
   });
 }
+
 
 // -------------------------------------------
 // Zufälligen Punkt auf Land finden
