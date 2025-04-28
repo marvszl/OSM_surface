@@ -1,4 +1,5 @@
-/* Grundlegendes Layout */
+/* Standard Layout für Desktop */
+
 body, html {
   margin: 0;
   padding: 0;
@@ -10,7 +11,7 @@ body, html {
   height: 100%;
 }
 
-/* Buttonleiste oben rechts */
+/* Button-Leiste */
 #toggleButtons {
   position: absolute;
   top: 10px;
@@ -34,7 +35,7 @@ body, html {
   gap: 5px;
 }
 
-/* Filterbox, Suchbereich, Legende */
+/* Bereiche */
 #filter, #legendBox, #searchArea {
   position: absolute;
   z-index: 1000;
@@ -50,7 +51,6 @@ body, html {
   transition: all 0.3s ease;
 }
 
-/* Position der einzelnen Boxen */
 #filter {
   top: 50px;
   right: 10px;
@@ -73,23 +73,23 @@ body, html {
   gap: 5px;
 }
 
-/* Eingabefelder und Buttons im Suchbereich (iPhone Fix: mind. 16px!) */
+/* Eingabefelder und Buttons in Suche */
 #searchArea input,
 #searchArea select,
 #searchArea button {
   width: 220px;
-  font-size: 16px; /* Wichtig für iPhone: mindestens 16px, damit kein Zoom */
+  font-size: 16px; /* Immer mind. 16px: iPhone Fix */
   padding: 4px;
 }
 
-/* Filter Checkboxen */
+/* Filter-Labels */
 #filter label {
   display: flex;
   align-items: center;
   margin-bottom: 6px;
 }
 
-/* Farbboxen */
+/* Farbbox */
 .color-box {
   width: 16px;
   height: 16px;
@@ -98,7 +98,7 @@ body, html {
   border: 1px solid #000;
 }
 
-/* Zoomlevel Anzeige unten rechts */
+/* Zoomlevel */
 #zoomLevel {
   position: absolute;
   bottom: 10px;
@@ -147,12 +147,12 @@ body, html {
   pointer-events: none;
 }
 
-/* --------------------------------
-   Mobile Optimierungen (bis 768px)
-   -------------------------------- */
+/* ---------------------------
+   Nur für Mobilgeräte (<768px)
+   --------------------------- */
 @media (max-width: 768px) {
   
-  /* Buttonleiste */
+  /* Buttonleiste auf Spalte umstellen */
   #toggleButtons {
     flex-direction: column;
     right: 10px;
@@ -168,12 +168,12 @@ body, html {
     justify-content: center;
   }
 
-  /* Nur Icon auf Mobile */
+  /* Nur Icon anzeigen */
   #toggleButtons button span {
     display: none;
   }
 
-  /* Kompaktere Boxen */
+  /* Boxen kompakter */
   #searchArea,
   #filter,
   #legendBox {
