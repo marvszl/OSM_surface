@@ -43,6 +43,30 @@ function toggleSearchArea() {
   searchVisible = !searchVisible;
 }
 
+//Karte zurücksetzen
+
+function resetMap() {
+  clearMarkers(); // Alle Marker entfernen
+  
+  // Karte auf Startposition und Zoom setzen
+  map.setView(startPosition, startZoom);
+
+  // Suchfeld leeren
+  document.getElementById('searchInput').value = "";
+  const results = document.getElementById('results');
+  results.style.display = "none";
+  results.innerHTML = "";
+
+  // Optional: Koordinatenfeld leeren
+  document.getElementById('coordInput').value = "";
+
+  // Filterbox (Checkboxen) auf ursprüngliche Werte zurücksetzen
+  const checkboxes = document.querySelectorAll('#filter input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true; // alle Checkboxen wieder aktivieren
+  });
+}
+
 
 //Merkierungen löschen
 function clearMarkers() {
