@@ -19,17 +19,31 @@ let searchVisible = true;
 
 // -------------------------------------------
 // Suchbereich ein-/ausblenden
+
 function toggleSearchArea() {
   const searchArea = document.getElementById('searchArea');
+  const filter = document.getElementById('filter');
+  const legend = document.getElementById('legendBox');
+
   if (searchVisible) {
     searchArea.classList.add('hidden');
     setTimeout(() => searchArea.style.display = 'none', 300);
   } else {
     searchArea.style.display = 'flex';
     setTimeout(() => searchArea.classList.remove('hidden'), 10);
+
+    // Auf Mobile: Andere schließen
+    if (window.innerWidth <= 768) {
+      filter.style.display = 'none';
+      legend.style.display = 'none';
+      filterVisible = false;
+      legendVisible = false;
+    }
   }
   searchVisible = !searchVisible;
 }
+
+
 //Merkierungen löschen
 function clearMarkers() {
   // Straßenlayer entfernen
@@ -201,30 +215,56 @@ function copyCoordinates() {
 
 
 // Filterbox ein-/ausblenden
+
 function toggleFilter() {
   const filter = document.getElementById('filter');
+  const searchArea = document.getElementById('searchArea');
+  const legend = document.getElementById('legendBox');
+
   if (filterVisible) {
     filter.classList.add('hidden');
     setTimeout(() => filter.style.display = 'none', 300);
   } else {
     filter.style.display = 'block';
     setTimeout(() => filter.classList.remove('hidden'), 10);
+
+    // Auf Mobile: Andere schließen
+    if (window.innerWidth <= 768) {
+      searchArea.style.display = 'none';
+      legend.style.display = 'none';
+      searchVisible = false;
+      legendVisible = false;
+    }
   }
   filterVisible = !filterVisible;
 }
 
+
 // Legendenbox ein-/ausblenden
+
 function toggleLegend() {
   const legend = document.getElementById('legendBox');
+  const searchArea = document.getElementById('searchArea');
+  const filter = document.getElementById('filter');
+
   if (legendVisible) {
     legend.classList.add('hidden');
     setTimeout(() => legend.style.display = 'none', 300);
   } else {
     legend.style.display = 'block';
     setTimeout(() => legend.classList.remove('hidden'), 10);
+
+    // Auf Mobile: Andere schließen
+    if (window.innerWidth <= 768) {
+      searchArea.style.display = 'none';
+      filter.style.display = 'none';
+      searchVisible = false;
+      filterVisible = false;
+    }
   }
   legendVisible = !legendVisible;
 }
+
 
 // -------------------------------------------
 // Nutzer-Standort bestimmen
