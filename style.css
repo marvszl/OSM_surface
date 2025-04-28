@@ -47,7 +47,7 @@ body, html {
   font-size: 14px;
   min-width: 240px;
   max-height: 90%;
-  overflow: auto;
+  /*overflow: auto;*/
   transition: all 0.3s ease;
 }
 
