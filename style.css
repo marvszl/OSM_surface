@@ -67,7 +67,7 @@ body, html {
 #searchArea {
   top: 10px;
   left: 50px;
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: flex-start;
   gap: 5px;
