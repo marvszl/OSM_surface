@@ -118,6 +118,50 @@ function centerMap(place) {
   marker = L.marker([lat, lon]).addTo(map);
 }
 
+// Koordinaten suchen
+
+function goToCoordinates() {
+  const input = document.getElementById('coordInput').value.trim();
+  
+  if (!input.includes(",")) {
+    alert("Bitte Koordinaten im Format: Breite, Länge eingeben!");
+    return;
+  }
+
+  const parts = input.split(",");
+  if (parts.length !== 2) {
+    alert("Bitte genau zwei Werte eingeben: Breite und Länge, getrennt durch Komma.");
+    return;
+  }
+
+  const lat = parseFloat(parts[0]);
+  const lon = parseFloat(parts[1]);
+
+  if (isNaN(lat) || isNaN(lon)) {
+    alert("Ungültige Zahlenangabe. Bitte überprüfe die Koordinaten.");
+    return;
+  }
+
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    alert("Ungültige Werte: Breite muss zwischen -90 und 90, Länge zwischen -180 und 180 liegen.");
+    return;
+  }
+
+  // Karte auf Koordinaten setzen
+  map.setView([lat, lon], 14);
+
+  // Alten Marker löschen, falls vorhanden
+  if (marker) {
+    map.removeLayer(marker);
+  }
+
+  // Neuen Marker setzen
+  marker = L.marker([lat, lon]).addTo(map);
+
+  // Popup zum Marker
+  const coords = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  marker.bindPopup(`📍 Koordinaten: ${coords}`).openPopup();
+}
 
 
 // Karte: Klick für Marker mit kopierbaren Koordinaten
