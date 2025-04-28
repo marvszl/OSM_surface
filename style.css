@@ -81,6 +81,13 @@ body, html {
 }
 
 /* Eingabefelder und Buttons im Suchbereich */
+
+#searchArea input,
+#searchArea select,
+#searchArea button {
+  font-size: 16px; /* Minimum 16px, damit iOS nicht reinzoomt */
+}
+
 #searchArea input,
 #searchArea select {
   width: 220px;
